@@ -1,8 +1,10 @@
 # Working in quant-research
 
-## Start with poteto mode
+## Start with poteto mode and the project record
 
 When changing code, fixtures, or documents, or creating or updating a PR, read [poteto mode](.agents/pstack/skills/poteto-mode/SKILL.md) in full, open the matching playbook in [`playbooks/`](.agents/pstack/skills/poteto-mode/playbooks), and copy its steps verbatim into the task list before the first edit. Follow narrower human instructions when they override a skill.
+
+Read [the project state](docs/project-state.md) before choosing or planning work. It links the [architecture](docs/architecture.md), [decisions](docs/decisions.md), [open questions](docs/open-questions.md), [to dos](docs/todos.md), [master plan](docs/master-plan.md), and [initial PR plan](docs/initial-prs.md). Keep one authoritative home for each fact and link to it instead of copying. Skip both reads for questions, reviews, and setup tasks that need neither.
 
 ## Keep changes narrow
 
@@ -20,13 +22,18 @@ While iterating, run only the tests that cover the change:
 PYTHONPATH=src uv run python -m pytest tests/<file>.py -k <name>
 ```
 
-The smoke suite runs on its own. The commit hook checks the staged tree, the merge-commit hook checks a merge result, and a rebase checks the rebased head. Do not run `make verify` or `make coverage`. The full suite runs once, inside `make merge`, on the exact commit that lands, and `make merge` posts its `Passed` line to the PR. A PR whose diff against main touches only `docs/**/*.md`, top-level Markdown files, or `.claude/` runs the smoke suite there instead. When an earlier full run passed the same gate inputs, the output also shows a `Skipped tests/test_repo_gates.py` line.
+The smoke suite runs on its own. The commit hook checks the staged tree, the merge-commit hook checks a merge result, and a rebase checks the rebased head. Do not run `make verify` or `make coverage`. The full suite runs once, inside `make merge`, on the exact commit that lands, and `make merge` posts its `Passed` line to the PR. A PR whose diff against main touches only `docs/**/*.md`, top-level Markdown files, or `.claude/` runs the smoke suite there instead. When an earlier full run passed the same gate inputs, the output also shows a `Skipped tests/test_repo_gates.py` line ([D072](docs/decisions.md#d072-skip-gate-tests-whose-exact-inputs-already-passed)).
 
 ## Merge
 
-- `make merge PR=<n>` is the only way to merge. It waits for a lock that every worktree of this clone shares, merges newer main in, runs the suite, and merges the commit that passed
+- `make merge PR=<n>` is the only way to merge. It waits for a lock that every worktree of this clone shares, merges newer main in, runs the suite, and merges the commit that passed ([D074](docs/decisions.md#d074-run-the-full-suite-only-inside-make-merge))
 - Run `make merge` in the background and watch it; failing tests print as they fail. Any fix needs a new `make merge`
+- When several PRs are open, give each a fixed D number above main's highest up front; keep numeric order, gaps are fine
 - Several sessions share this machine; stop only your own `make merge` run, never `pkill` by pattern
+
+## Update the record when facts change
+
+When a PR changes capabilities, decisions, open questions, or next steps, update the affected page in the same PR. Distinguish proposed, implemented, and verified behavior. Never mark real-framework acceptance complete using synthetic fixtures. Do not leave a decision or prerequisite only in chat or an agent's memory.
 
 ## Tools and conventions
 
