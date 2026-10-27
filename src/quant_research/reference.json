@@ -1,0 +1,1 @@
+{"baseline":"buy_and_hold_market","cutoff":"2026-10-23T00:00:00Z","evaluation":{"alpha":"0.05","minimum_effect":"0.001","subperiods":4,"version":"pilot-evaluation/v1"},"schema_version":1,"window":{"end":"2026-08-01","start":"1960-04-01"}}

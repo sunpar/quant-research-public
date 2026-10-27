@@ -1,0 +1,388 @@
+{
+    "realtime_start": "1776-07-04",
+    "realtime_end": "9999-12-31",
+    "observation_start": "1600-01-01",
+    "observation_end": "9999-12-31",
+    "units": "lin",
+    "output_type": 1,
+    "file_type": "json",
+    "order_by": "observation_date",
+    "sort_order": "asc",
+    "count": 62,
+    "offset": 0,
+    "limit": 100000,
+    "observations": [
+        {
+            "realtime_start": "1960-03-15",
+            "realtime_end": "1961-02-08",
+            "date": "1959-10-01",
+            "value": "6.0"
+        },
+        {
+            "realtime_start": "1961-02-09",
+            "realtime_end": "1962-01-30",
+            "date": "1959-10-01",
+            "value": "5.8"
+        },
+        {
+            "realtime_start": "1962-01-31",
+            "realtime_end": "1963-03-06",
+            "date": "1959-10-01",
+            "value": "5.7"
+        },
+        {
+            "realtime_start": "1963-03-07",
+            "realtime_end": "1964-02-05",
+            "date": "1959-10-01",
+            "value": "5.6"
+        },
+        {
+            "realtime_start": "1964-02-06",
+            "realtime_end": "9999-12-31",
+            "date": "1959-10-01",
+            "value": "5.7"
+        },
+        {
+            "realtime_start": "1960-03-15",
+            "realtime_end": "1961-02-08",
+            "date": "1959-11-01",
+            "value": "5.9"
+        },
+        {
+            "realtime_start": "1961-02-09",
+            "realtime_end": "1964-02-05",
+            "date": "1959-11-01",
+            "value": "5.8"
+        },
+        {
+            "realtime_start": "1964-02-06",
+            "realtime_end": "1965-02-02",
+            "date": "1959-11-01",
+            "value": "5.9"
+        },
+        {
+            "realtime_start": "1965-02-03",
+            "realtime_end": "1966-02-07",
+            "date": "1959-11-01",
+            "value": "5.8"
+        },
+        {
+            "realtime_start": "1966-02-08",
+            "realtime_end": "1967-02-08",
+            "date": "1959-11-01",
+            "value": "5.9"
+        },
+        {
+            "realtime_start": "1967-02-09",
+            "realtime_end": "9999-12-31",
+            "date": "1959-11-01",
+            "value": "5.8"
+        },
+        {
+            "realtime_start": "1960-03-15",
+            "realtime_end": "1962-01-30",
+            "date": "1959-12-01",
+            "value": "5.5"
+        },
+        {
+            "realtime_start": "1962-01-31",
+            "realtime_end": "1964-02-05",
+            "date": "1959-12-01",
+            "value": "5.4"
+        },
+        {
+            "realtime_start": "1964-02-06",
+            "realtime_end": "9999-12-31",
+            "date": "1959-12-01",
+            "value": "5.3"
+        },
+        {
+            "realtime_start": "1960-03-15",
+            "realtime_end": "1961-02-08",
+            "date": "1960-01-01",
+            "value": "5.2"
+        },
+        {
+            "realtime_start": "1961-02-09",
+            "realtime_end": "1967-02-08",
+            "date": "1960-01-01",
+            "value": "5.3"
+        },
+        {
+            "realtime_start": "1967-02-09",
+            "realtime_end": "9999-12-31",
+            "date": "1960-01-01",
+            "value": "5.2"
+        },
+        {
+            "realtime_start": "1960-03-15",
+            "realtime_end": "1962-01-30",
+            "date": "1960-02-01",
+            "value": "4.8"
+        },
+        {
+            "realtime_start": "1962-01-31",
+            "realtime_end": "1963-03-06",
+            "date": "1960-02-01",
+            "value": "4.9"
+        },
+        {
+            "realtime_start": "1963-03-07",
+            "realtime_end": "1964-02-05",
+            "date": "1960-02-01",
+            "value": "5.0"
+        },
+        {
+            "realtime_start": "1964-02-06",
+            "realtime_end": "1967-02-08",
+            "date": "1960-02-01",
+            "value": "4.9"
+        },
+        {
+            "realtime_start": "1967-02-09",
+            "realtime_end": "9999-12-31",
+            "date": "1960-02-01",
+            "value": "4.8"
+        },
+        {
+            "realtime_start": "1960-04-12",
+            "realtime_end": "1961-02-08",
+            "date": "1960-03-01",
+            "value": "5.4"
+        },
+        {
+            "realtime_start": "1961-02-09",
+            "realtime_end": "1962-01-30",
+            "date": "1960-03-01",
+            "value": "5.5"
+        },
+        {
+            "realtime_start": "1962-01-31",
+            "realtime_end": "1963-03-06",
+            "date": "1960-03-01",
+            "value": "5.4"
+        },
+        {
+            "realtime_start": "1963-03-07",
+            "realtime_end": "1967-02-08",
+            "date": "1960-03-01",
+            "value": "5.5"
+        },
+        {
+            "realtime_start": "1967-02-09",
+            "realtime_end": "9999-12-31",
+            "date": "1960-03-01",
+            "value": "5.4"
+        },
+        {
+            "realtime_start": "1960-05-11",
+            "realtime_end": "1961-02-08",
+            "date": "1960-04-01",
+            "value": "5.0"
+        },
+        {
+            "realtime_start": "1961-02-09",
+            "realtime_end": "1962-01-30",
+            "date": "1960-04-01",
+            "value": "5.1"
+        },
+        {
+            "realtime_start": "1962-01-31",
+            "realtime_end": "9999-12-31",
+            "date": "1960-04-01",
+            "value": "5.2"
+        },
+        {
+            "realtime_start": "1960-06-13",
+            "realtime_end": "1961-02-08",
+            "date": "1960-05-01",
+            "value": "4.9"
+        },
+        {
+            "realtime_start": "1961-02-09",
+            "realtime_end": "1963-03-06",
+            "date": "1960-05-01",
+            "value": "5.1"
+        },
+        {
+            "realtime_start": "1963-03-07",
+            "realtime_end": "1967-02-08",
+            "date": "1960-05-01",
+            "value": "5.2"
+        },
+        {
+            "realtime_start": "1967-02-09",
+            "realtime_end": "9999-12-31",
+            "date": "1960-05-01",
+            "value": "5.1"
+        },
+        {
+            "realtime_start": "1960-07-12",
+            "realtime_end": "1961-02-08",
+            "date": "1960-06-01",
+            "value": "5.5"
+        },
+        {
+            "realtime_start": "1961-02-09",
+            "realtime_end": "1963-03-06",
+            "date": "1960-06-01",
+            "value": "5.4"
+        },
+        {
+            "realtime_start": "1963-03-07",
+            "realtime_end": "1964-02-05",
+            "date": "1960-06-01",
+            "value": "5.5"
+        },
+        {
+            "realtime_start": "1964-02-06",
+            "realtime_end": "9999-12-31",
+            "date": "1960-06-01",
+            "value": "5.4"
+        },
+        {
+            "realtime_start": "1960-08-10",
+            "realtime_end": "1961-02-08",
+            "date": "1960-07-01",
+            "value": "5.4"
+        },
+        {
+            "realtime_start": "1961-02-09",
+            "realtime_end": "1962-01-30",
+            "date": "1960-07-01",
+            "value": "5.5"
+        },
+        {
+            "realtime_start": "1962-01-31",
+            "realtime_end": "1963-03-06",
+            "date": "1960-07-01",
+            "value": "5.4"
+        },
+        {
+            "realtime_start": "1963-03-07",
+            "realtime_end": "9999-12-31",
+            "date": "1960-07-01",
+            "value": "5.5"
+        },
+        {
+            "realtime_start": "1960-09-09",
+            "realtime_end": "1961-02-08",
+            "date": "1960-08-01",
+            "value": "5.9"
+        },
+        {
+            "realtime_start": "1961-02-09",
+            "realtime_end": "1962-01-30",
+            "date": "1960-08-01",
+            "value": "5.8"
+        },
+        {
+            "realtime_start": "1962-01-31",
+            "realtime_end": "1968-02-06",
+            "date": "1960-08-01",
+            "value": "5.7"
+        },
+        {
+            "realtime_start": "1968-02-07",
+            "realtime_end": "9999-12-31",
+            "date": "1960-08-01",
+            "value": "5.6"
+        },
+        {
+            "realtime_start": "1960-10-10",
+            "realtime_end": "1963-03-06",
+            "date": "1960-09-01",
+            "value": "5.7"
+        },
+        {
+            "realtime_start": "1963-03-07",
+            "realtime_end": "1967-02-08",
+            "date": "1960-09-01",
+            "value": "5.6"
+        },
+        {
+            "realtime_start": "1967-02-09",
+            "realtime_end": "9999-12-31",
+            "date": "1960-09-01",
+            "value": "5.5"
+        },
+        {
+            "realtime_start": "1960-11-10",
+            "realtime_end": "1961-02-08",
+            "date": "1960-10-01",
+            "value": "6.4"
+        },
+        {
+            "realtime_start": "1961-02-09",
+            "realtime_end": "1962-01-30",
+            "date": "1960-10-01",
+            "value": "6.3"
+        },
+        {
+            "realtime_start": "1962-01-31",
+            "realtime_end": "1963-03-06",
+            "date": "1960-10-01",
+            "value": "6.1"
+        },
+        {
+            "realtime_start": "1963-03-07",
+            "realtime_end": "1964-02-05",
+            "date": "1960-10-01",
+            "value": "6.0"
+        },
+        {
+            "realtime_start": "1964-02-06",
+            "realtime_end": "9999-12-31",
+            "date": "1960-10-01",
+            "value": "6.1"
+        },
+        {
+            "realtime_start": "1960-12-12",
+            "realtime_end": "1961-02-08",
+            "date": "1960-11-01",
+            "value": "6.3"
+        },
+        {
+            "realtime_start": "1961-02-09",
+            "realtime_end": "1968-02-06",
+            "date": "1960-11-01",
+            "value": "6.2"
+        },
+        {
+            "realtime_start": "1968-02-07",
+            "realtime_end": "1969-02-10",
+            "date": "1960-11-01",
+            "value": "6.1"
+        },
+        {
+            "realtime_start": "1969-02-11",
+            "realtime_end": "1970-02-05",
+            "date": "1960-11-01",
+            "value": "6.2"
+        },
+        {
+            "realtime_start": "1970-02-06",
+            "realtime_end": "9999-12-31",
+            "date": "1960-11-01",
+            "value": "6.1"
+        },
+        {
+            "realtime_start": "1961-01-13",
+            "realtime_end": "1962-01-30",
+            "date": "1960-12-01",
+            "value": "6.8"
+        },
+        {
+            "realtime_start": "1962-01-31",
+            "realtime_end": "1963-03-06",
+            "date": "1960-12-01",
+            "value": "6.7"
+        },
+        {
+            "realtime_start": "1963-03-07",
+            "realtime_end": "9999-12-31",
+            "date": "1960-12-01",
+            "value": "6.6"
+        }
+    ]
+}

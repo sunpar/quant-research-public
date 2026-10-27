@@ -1,0 +1,38 @@
+{
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": false,
+    "pstack@cursor-plugins": false,
+    "react-skills@claude-settings": false,
+    "agent-browser@claude-settings": false,
+    "frontend-design@claude-plugins-official": false,
+    "frontend-design-skills@claude-settings": false,
+    "web-performance-skills@claude-settings": false,
+    "openobserve-skills@claude-settings": false,
+    "skill-creator@claude-plugins-official": false,
+    "claude-md-management@claude-plugins-official": false,
+    "feature-dev@claude-plugins-official": false
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'For any change or PR, work in poteto mode: read .agents/pstack/skills/poteto-mode/SKILL.md in full, open the matching playbook in .agents/pstack/skills/poteto-mode/playbooks/, and copy its steps verbatim into the task list before the first edit.'"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I \"$CLAUDE_PROJECT_DIR/.claude/hooks/merge_gate.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

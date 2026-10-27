@@ -1,0 +1,100 @@
+{
+    "realtime_start": "1776-07-04",
+    "realtime_end": "9999-12-31",
+    "observation_start": "1600-01-01",
+    "observation_end": "9999-12-31",
+    "units": "lin",
+    "output_type": 1,
+    "file_type": "json",
+    "order_by": "observation_date",
+    "sort_order": "asc",
+    "count": 14,
+    "offset": 0,
+    "limit": 100000,
+    "observations": [
+        {
+            "realtime_start": "1989-11-03",
+            "realtime_end": "1993-01-07",
+            "date": "1989-10-01",
+            "value": "5.3"
+        },
+        {
+            "realtime_start": "1993-01-08",
+            "realtime_end": "1994-01-06",
+            "date": "1989-10-01",
+            "value": "5.4"
+        },
+        {
+            "realtime_start": "1994-01-07",
+            "realtime_end": "9999-12-31",
+            "date": "1989-10-01",
+            "value": "5.3"
+        },
+        {
+            "realtime_start": "1989-12-08",
+            "realtime_end": "1990-01-04",
+            "date": "1989-11-01",
+            "value": "5.4"
+        },
+        {
+            "realtime_start": "1990-01-05",
+            "realtime_end": "1992-01-09",
+            "date": "1989-11-01",
+            "value": "5.3"
+        },
+        {
+            "realtime_start": "1992-01-10",
+            "realtime_end": "9999-12-31",
+            "date": "1989-11-01",
+            "value": "5.4"
+        },
+        {
+            "realtime_start": "1990-01-05",
+            "realtime_end": "1993-01-07",
+            "date": "1989-12-01",
+            "value": "5.3"
+        },
+        {
+            "realtime_start": "1993-01-08",
+            "realtime_end": "9999-12-31",
+            "date": "1989-12-01",
+            "value": "5.4"
+        },
+        {
+            "realtime_start": "1990-02-02",
+            "realtime_end": "1996-03-07",
+            "date": "1990-01-01",
+            "value": "5.3"
+        },
+        {
+            "realtime_start": "1996-03-08",
+            "realtime_end": "9999-12-31",
+            "date": "1990-01-01",
+            "value": "5.4"
+        },
+        {
+            "realtime_start": "2025-11-20",
+            "realtime_end": "9999-12-31",
+            "date": "2025-09-01",
+            "value": "4.4"
+        },
+        {
+            "realtime_start": "2025-12-16",
+            "realtime_end": "9999-12-31",
+            "date": "2025-10-01",
+            "value": "."
+        },
+        {
+            "realtime_start": "2025-12-16",
+            "realtime_end": "2026-01-08",
+            "date": "2025-11-01",
+            "value": "4.6"
+        },
+        {
+            "realtime_start": "2026-01-09",
+            "realtime_end": "9999-12-31",
+            "date": "2025-11-01",
+            "value": "4.5"
+        }
+    ]
+}

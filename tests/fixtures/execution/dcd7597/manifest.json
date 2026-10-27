@@ -1,0 +1,87 @@
+{
+  "baseline": "dcd75975851896d58497c2f3fdf6e0bcdafac6e0",
+  "capture": "20261024T020454Z-82250f96",
+  "baseline_manifest_sha256": "d36436bfeabf56f7e80b7529d124daebec32d718979873523d7cba30e7c56b29",
+  "files": [
+    {
+      "bytes": 9240,
+      "path": "provenance.json",
+      "sha256": "2250623218c0d0134b635caef6b30d48edf826c2ba59066feabad3143e740174"
+    },
+    {
+      "bytes": 853,
+      "path": "reply-before-report-loss/before-kill/activity-5-input-0.payload.data",
+      "sha256": "23bbfa965f4f3b5f0ca726b57ba8c76bfd57f49a1cce68d5d0c8ae8a29ab71ee"
+    },
+    {
+      "bytes": 523,
+      "path": "reply-before-report-loss/before-kill/calls/0.json",
+      "sha256": "616ac97179e9c720dd7cd1418a2840592749712860d5ef5f15d7911f4e6b5eed"
+    },
+    {
+      "bytes": 760,
+      "path": "reply-before-report-loss/before-kill/calls/1.json",
+      "sha256": "5c570df14f9f5637b01865f1220a4e5ef186fd6a15f2366ec582b6c03e8e72f1"
+    },
+    {
+      "bytes": 171,
+      "path": "reply-before-report-loss/before-kill/calls.transcripts/04d057acca663c4cb1e029c0149cbd6e6d76939cc2e7fd5896dafad98aa0d179",
+      "sha256": "04d057acca663c4cb1e029c0149cbd6e6d76939cc2e7fd5896dafad98aa0d179"
+    },
+    {
+      "bytes": 8,
+      "path": "reply-before-report-loss/before-kill/calls.transcripts/b2437a6aa53010b70011f253d0ef2e75d5a15350811531d9b82c27e77a706081",
+      "sha256": "b2437a6aa53010b70011f253d0ef2e75d5a15350811531d9b82c27e77a706081"
+    },
+    {
+      "bytes": 18978,
+      "path": "reply-before-report-loss/closed/history.json",
+      "sha256": "3a24ac2401a764d3c49be737bf01003a41983fb0868f9f2b253e6c60fe02ca9e"
+    },
+    {
+      "bytes": 215,
+      "path": "reply-before-report-loss/closed/memo.json",
+      "sha256": "de3cf26bb7d8212ad8fc73f3ff64ab806a27e895cc507c3141b07f0e3b3436da"
+    },
+    {
+      "bytes": 3028,
+      "path": "reply-before-report-loss/expected-record.payload.data",
+      "sha256": "05288c867b1bd2f9d6150f90c252cd8a2fdce31c52f1bc4f1ba5036a7736ad76"
+    },
+    {
+      "bytes": 32,
+      "path": "reply-before-report-loss/expected-summary.payload.data",
+      "sha256": "523a5b9e9b17eaa864f281a47473fe963c2d73e8836c06750c1e6ecd828c31c0"
+    },
+    {
+      "bytes": 790,
+      "path": "reply-before-report-loss/plan.payload.data",
+      "sha256": "362afc70dc99af606d384835137799cd4ec596032975539bfb1ac094eba7df37"
+    },
+    {
+      "bytes": 17230,
+      "path": "steering-cancel/closed/history.json",
+      "sha256": "90d426aeb24f2fd2584c5f33f69ef5fd68426c461a5feefdbdb79ad551e6c0fc"
+    },
+    {
+      "bytes": 215,
+      "path": "steering-cancel/closed/memo.json",
+      "sha256": "17cb4960dd5ed3e2cdb92e920903578fb7d158af331e5c206cdd65c1159b5bba"
+    },
+    {
+      "bytes": 2581,
+      "path": "steering-cancel/expected-record.payload.data",
+      "sha256": "3bdbd3dd8990bc8666dd0572c7aabf9cc5ddb4e8eb217cf66e344b567ce3c450"
+    },
+    {
+      "bytes": 32,
+      "path": "steering-cancel/expected-summary.payload.data",
+      "sha256": "d33211465de6a530642b4660a42195aa2227e4cf995d320d42ea97f8d6167d2e"
+    },
+    {
+      "bytes": 790,
+      "path": "steering-cancel/plan.payload.data",
+      "sha256": "55034874feec9e4e5dde1e13f87cddf4e6b7b3e01b35c390bcbb821e13d9e1d3"
+    }
+  ]
+}

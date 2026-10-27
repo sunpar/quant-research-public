@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "task_set_id": "8cbd6e52612166d0a5b00d2d40f24158126fe00b0849186c81271eb528ed3ee0",
+  "answers": {
+    "task-1": {
+      "kind": "flawed",
+      "estimates": {},
+      "tolerance": 0
+    },
+    "task-2": {
+      "kind": "paper_reproduction",
+      "estimates": {
+        "beta": 0.25
+      },
+      "tolerance": 1e-09
+    },
+    "task-3": {
+      "kind": "known_answer",
+      "estimates": {
+        "beta": 0.5
+      },
+      "tolerance": 1e-09
+    },
+    "task-4": {
+      "kind": "null",
+      "estimates": {},
+      "tolerance": 0
+    }
+  }
+}

@@ -1,0 +1,283 @@
+{
+  "code": [
+    {
+      "bytes": 7938,
+      "path": "tests/conftest.py",
+      "sha256": "94d5ef448a7010f66f683742750eff404a1991bd52ab5653a8f76285a25968a0"
+    },
+    {
+      "bytes": 43921,
+      "path": "tests/test_execution.py",
+      "sha256": "a3bb25d2a7c4f2e32c81d0bf69f87b8ffb55a3fe45e84057faf65eee22cd4bdd"
+    },
+    {
+      "bytes": 879,
+      "path": "pyproject.toml",
+      "sha256": "5d2ebb1bf331ad608a69408a51bfa92b06b87d0316c97014bcc8374e8952b05b"
+    },
+    {
+      "bytes": 191985,
+      "path": "uv.lock",
+      "sha256": "f5280225e2a105054542dff714dedf804a9ce867a5aa6ca62d56f1262c86d784"
+    },
+    {
+      "bytes": 17875,
+      "path": "capture/capture.py",
+      "sha256": "df2d66bc5b56da208cf43225d622145f5d8ceec4d31adf1076f5815290ab2bc8"
+    },
+    {
+      "bytes": 6618,
+      "path": "capture/test_cancel_capture.py",
+      "sha256": "e1de16913b53fe250e7aa10b2d101c2c1caa5ced1a2a2991b1f0c644edfb5d66"
+    },
+    {
+      "bytes": 0,
+      "path": "src/quant_research/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 34812,
+      "path": "src/quant_research/__main__.py",
+      "sha256": "7781d8670646b4333606bde7fb95ec780ffbd52395a1d07ad690ca0637da1a1a"
+    },
+    {
+      "bytes": 11276,
+      "path": "src/quant_research/acceptance.py",
+      "sha256": "2ec9b7def663938d40c19897baa1c926f8bbb57d35cba8b3cbf4b738d0a60c77"
+    },
+    {
+      "bytes": 6489,
+      "path": "src/quant_research/access.py",
+      "sha256": "1441c0ae2d025585dace448aee8cc66b423479e61f00bbe898251b14e615a577"
+    },
+    {
+      "bytes": 21634,
+      "path": "src/quant_research/accounting.py",
+      "sha256": "bbf00a17b50dd9f0eca8d57843765629a40bc9268f9ef2b172dfdea1e7e80915"
+    },
+    {
+      "bytes": 18788,
+      "path": "src/quant_research/activities.py",
+      "sha256": "612a347b1d3c965de0849d04581f069e63aae11afaf5bf19bf6944b57285931f"
+    },
+    {
+      "bytes": 23181,
+      "path": "src/quant_research/agent_tools.py",
+      "sha256": "d7cb1f378948be0d29f72c34b8e03c64e69c9c75d1fc0796bb612d0859659e4b"
+    },
+    {
+      "bytes": 9085,
+      "path": "src/quant_research/backtest.py",
+      "sha256": "ff1b5b81f00e9ec5055aa11c410d8c07dc46ee12b8672727a02aa18eb7771f65"
+    },
+    {
+      "bytes": 39487,
+      "path": "src/quant_research/campaigns.py",
+      "sha256": "e311e3f7855b9f1bcc646669ab941c252ca083e1d1bc64b7e341c5f010161e26"
+    },
+    {
+      "bytes": 40850,
+      "path": "src/quant_research/capability.py",
+      "sha256": "75fb49b3b0f6a0b356fc83274632704fed54c6c90cdf789125fa771a9759b207"
+    },
+    {
+      "bytes": 10920,
+      "path": "src/quant_research/catalog.py",
+      "sha256": "12fe854dc1487924b5c5a3d61805e6b2094324d6ceaba24a16af108affd3cc55"
+    },
+    {
+      "bytes": 15229,
+      "path": "src/quant_research/claude_adapter.py",
+      "sha256": "28fca2b68a3a13f9b9a2cf3a9578bc745b00e8214b7403e6319ebe7adbe6ebc7"
+    },
+    {
+      "bytes": 20299,
+      "path": "src/quant_research/code_index.py",
+      "sha256": "8a6ba4d0acd73d85730a69e5d7032cbe379f00ac02e2f2908a19d8206f343d84"
+    },
+    {
+      "bytes": 25119,
+      "path": "src/quant_research/codex_adapter.py",
+      "sha256": "0316f18621b522d08458971fe8ef4b077da4dc9d50f0b9edcece9605ee373800"
+    },
+    {
+      "bytes": 9518,
+      "path": "src/quant_research/compare.py",
+      "sha256": "a883b6d8539cd37a75a0a9e7de8374a67451fe0433e25e298401aa26f24eb467"
+    },
+    {
+      "bytes": 6405,
+      "path": "src/quant_research/confirmation.py",
+      "sha256": "e7d3c760a80e2b75de1a15e879df2e9b336dbf22310f5408b0424a2bfc9b365f"
+    },
+    {
+      "bytes": 23203,
+      "path": "src/quant_research/confirmation_review.py",
+      "sha256": "e8821e78cee77a621cd2bcf78761250045a540b69ec1a63dd54b77b6374cc7d2"
+    },
+    {
+      "bytes": 21697,
+      "path": "src/quant_research/datasets.py",
+      "sha256": "218199f56cf300559f6fadecec92a6b904206f6b1eee690021daf16016ae8ffe"
+    },
+    {
+      "bytes": 7875,
+      "path": "src/quant_research/evaluation.py",
+      "sha256": "ebaf89b191c10dbc3aaa4c2547f6ce0429a2d829bc724f04c3092de31bc31e97"
+    },
+    {
+      "bytes": 30758,
+      "path": "src/quant_research/execution.py",
+      "sha256": "5f269478ed7f43905608e7394eeb9195d36a47cd0bf156d27a2fdfb578fd66e6"
+    },
+    {
+      "bytes": 22621,
+      "path": "src/quant_research/findings.py",
+      "sha256": "913186bf10b120aa8b073638c7448a609620c8fcd996cd55d6a337c06ed56719"
+    },
+    {
+      "bytes": 12883,
+      "path": "src/quant_research/invalidation.py",
+      "sha256": "880e7203efe744b2e7845396a1c9931058b0606b1bcda572d279005103882873"
+    },
+    {
+      "bytes": 17124,
+      "path": "src/quant_research/locators.py",
+      "sha256": "625cf356f2cbed56cf5e12e5ff53699491bebca7ee1d9cb9c1486700e252def3"
+    },
+    {
+      "bytes": 6304,
+      "path": "src/quant_research/model_provenance.py",
+      "sha256": "81ab94edf1b2d806c11f9933449425bfff4050243d55b6e30df882312111bed3"
+    },
+    {
+      "bytes": 24122,
+      "path": "src/quant_research/packages.py",
+      "sha256": "7ec23cd4632a3127d2caddc0ca465222fe69556cdda4181859d89f742e02f403"
+    },
+    {
+      "bytes": 18267,
+      "path": "src/quant_research/probit.py",
+      "sha256": "69e1aa603d949ff4acbf38705ef932c53ab6785090117985d194d219e8b863b9"
+    },
+    {
+      "bytes": 33044,
+      "path": "src/quant_research/prospective.py",
+      "sha256": "408d055eb25b2d4259aa6c6f7da17f4ec2025c9a9758f2caabc2543c204b3099"
+    },
+    {
+      "bytes": 42620,
+      "path": "src/quant_research/providers.py",
+      "sha256": "1df31031d1fb0b3c3027065361616f8fd3c98bf5e88e2748f3666f9b75650f77"
+    },
+    {
+      "bytes": 21111,
+      "path": "src/quant_research/public_data.py",
+      "sha256": "aacccf8f9d5bae91c283fe52cc414fc139cd07b81c15ce9ba29c3edd016ab393"
+    },
+    {
+      "bytes": 21077,
+      "path": "src/quant_research/reconcile.py",
+      "sha256": "b0f99e078d9241e2e4cdd6365aebef5aa6d50ca1052ee8d5e80d7aa7bf3ecfb2"
+    },
+    {
+      "bytes": 7566,
+      "path": "src/quant_research/records.py",
+      "sha256": "550dfbb89ccca1d39401535a18fd332a8f5f7cf75d5a7a9d8503f9242c828e0c"
+    },
+    {
+      "bytes": 63792,
+      "path": "src/quant_research/reference.py",
+      "sha256": "cd54a4006c1bbc74268f448339a69fdb07a68bb22f2bc0f9444427eef41fcc21"
+    },
+    {
+      "bytes": 25339,
+      "path": "src/quant_research/registry.py",
+      "sha256": "2010052a411994b072857a0bcb8efee6e961a929b00a5e7e550e9c4bf3b3426f"
+    },
+    {
+      "bytes": 31500,
+      "path": "src/quant_research/replay.py",
+      "sha256": "eb05dc4ca3c5d3f4afefd057fdf30f4ea087c905a7b03a4b23a0d8468a1bf1db"
+    },
+    {
+      "bytes": 14318,
+      "path": "src/quant_research/report.py",
+      "sha256": "34fd0b89e6c52ebe358fad9456195ec049e979f76e644430d68596917c8f987b"
+    },
+    {
+      "bytes": 14367,
+      "path": "src/quant_research/reproduction.py",
+      "sha256": "ec6bf216d4c9b8c35d81fff14e261b4606eddb97702e00f4a814c15c32a2948e"
+    },
+    {
+      "bytes": 111476,
+      "path": "src/quant_research/research.py",
+      "sha256": "edd8e3452f8dccb2d7cafe43c3b40138b5477de1cbab2aa81993d8d5f3c87dda"
+    },
+    {
+      "bytes": 5883,
+      "path": "src/quant_research/research_worker.py",
+      "sha256": "875d5f00a6d2a6d5aafe78161bdc13c0d970505330bb6e683a9b787354ebb61b"
+    },
+    {
+      "bytes": 13979,
+      "path": "src/quant_research/retrieval.py",
+      "sha256": "98dfbd109cd114a1bcc7c484d704818d44b9f412a1961e62d7419d3e8e62ad4e"
+    },
+    {
+      "bytes": 23975,
+      "path": "src/quant_research/signals.py",
+      "sha256": "d4ebc459793806e6337c97f07320739d23b638f090db8ddaf9c354e72eb47756"
+    },
+    {
+      "bytes": 20114,
+      "path": "src/quant_research/sources.py",
+      "sha256": "3020d00dcde480a00487c943a87de695cd5d7be334b458ed762b1d42a64ccc5d"
+    },
+    {
+      "bytes": 5651,
+      "path": "src/quant_research/splits.py",
+      "sha256": "bef033b9540d3ab2cef8655f81b3f2cae0f3cb404219564b39d491a898882586"
+    },
+    {
+      "bytes": 14737,
+      "path": "src/quant_research/steering.py",
+      "sha256": "9ffeb902fd005e22c30b94991c495e4742aed5d65d7abdfca8c9b677eb64f0f3"
+    },
+    {
+      "bytes": 3127,
+      "path": "src/quant_research/store.py",
+      "sha256": "97f948b26c67b9e41b88d58a4533fb96b13e45dc7175016db4b5903687bf5849"
+    },
+    {
+      "bytes": 16379,
+      "path": "src/quant_research/worker.py",
+      "sha256": "b33df3796ecb3f76daf510b3f2182e18230486565504a198cc26e6584873c018"
+    },
+    {
+      "bytes": 15612,
+      "path": "src/quant_research/workflows.py",
+      "sha256": "65adea02f0e565cc5e051683146a2a72dc1fec4d7ab0e8872a1d4b57316a3193"
+    }
+  ],
+  "dependencies": {
+    "protobuf": "7.36.2",
+    "pytest": "9.1.1",
+    "temporalio": "1.34.0"
+  },
+  "environment_keys": [
+    "HOME",
+    "LANG",
+    "PATH",
+    "PYTHONDONTWRITEBYTECODE",
+    "TMPDIR"
+  ],
+  "head": "e109d13b983990d8d8c3476680c2a2bbc08b21ee",
+  "no_provider_network_calls": true,
+  "production_baseline": "dcd7597",
+  "python": "3.12.13 (main, Mar  3 2026, 15:35:03) [Clang 21.1.4 ]",
+  "python_executable": "/Users/sunpar/.codex/worktrees/3ef0/quant-research/.venv/bin/python3",
+  "qualified_cli": "temporal version 1.9.1 (Server 1.32.0, UI 2.54.1)",
+  "source_matches_production_baseline": true
+}

@@ -1,0 +1,101 @@
+"""Save a hand-authored synthetic example with no computed research conclusion."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import subprocess
+import sys
+import sysconfig
+from datetime import UTC, datetime
+from pathlib import Path
+from uuid import UUID
+
+from quant_research.packages import (
+    ArtifactInput,
+    EnvironmentRecord,
+    ExecutionAttempt,
+    Outcome,
+    PackageRecord,
+    Specification,
+    TrialRecord,
+    save_package,
+)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("destination", type=Path)
+    args = parser.parse_args()
+    artifacts = (
+        ArtifactInput("input", b"entity,value\nsynthetic-a,1\n", "text/csv", "synthetic input"),
+        ArtifactInput(
+            "contract",
+            b"Hand-authored synthetic development example, version 1.\n",
+            "text/plain",
+            "data contract",
+        ),
+        ArtifactInput(
+            "implementation", Path(__file__).read_bytes(), "text/x-python", "authoring code"
+        ),
+        ArtifactInput(
+            "uv_lock",
+            (Path(__file__).resolve().parents[1] / "uv.lock").read_bytes(),
+            "text/plain",
+            "authoring environment lock",
+        ),
+        ArtifactInput(
+            "result", b"No research computation was performed.\n", "text/plain", "result"
+        ),
+    )
+    digests = {item.name: hashlib.sha256(item.data).hexdigest() for item in artifacts}
+    specification = Specification(
+        question="Demonstrate a portable synthetic development record",
+        signal_profile="hand-authored/v1",
+        evaluation_profile="unavailable/v1",
+        data_version="synthetic-example/v1",
+        implementation_version="authoring-example/v1",
+        input_digests=(digests["input"],),
+        data_contract_digest=digests["contract"],
+        implementation_digest=digests["implementation"],
+        environment=EnvironmentRecord(
+            sys.implementation.name,
+            ".".join(map(str, sys.version_info[:3])),
+            sysconfig.get_config_var("SOABI"),
+            sysconfig.get_platform(),
+            subprocess.check_output(["uv", "--version"], text=True).strip(),
+            digests["uv_lock"],
+        ),
+    )
+    trial_id = UUID("b92122c1-93b3-4917-8ba2-0a69964730dd")
+    record = PackageRecord(
+        trial_id,
+        (
+            TrialRecord(
+                trial_id,
+                UUID("11c56fe9-1213-4ddf-9e14-a94c7bff848e"),
+                specification,
+                (
+                    ExecutionAttempt(
+                        UUID("212e18c1-6af1-422e-a8fe-a0d65d9137ee"),
+                        UUID("1924868d-a6b5-47a4-96cd-15098c7371eb"),
+                        None,
+                        datetime(2026, 10, 21, 12, tzinfo=UTC),
+                        datetime(2026, 10, 21, 12, tzinfo=UTC),
+                        Outcome(
+                            "inconclusive",
+                            "Hand-authored example without a research computation",
+                            ("result",),
+                            ("Synthetic data only", "No scientific conclusion"),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+    saved = save_package(args.destination, record, artifacts)
+    print(saved.path)
+
+
+if __name__ == "__main__":
+    main()

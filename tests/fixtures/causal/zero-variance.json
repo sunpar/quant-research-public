@@ -1,0 +1,46 @@
+{
+  "contract": {
+    "version": 1,
+    "designation": "synthetic",
+    "dataset_id": "zero-variance",
+    "sessions": [
+      {"id": "s0", "occurred_at": "2026-01-05T16:00:00Z"},
+      {"id": "s1", "occurred_at": "2026-01-06T16:00:00Z"},
+      {"id": "s2", "occurred_at": "2026-01-07T16:00:00Z"}
+    ],
+    "level_unit": "synthetic_level",
+    "label_unit": "synthetic_target",
+    "evaluation_cutoff": "2026-01-07T18:00:00Z",
+    "signal_profile": "level-difference/v1",
+    "evaluation_profile": "descriptive-pearson/v1",
+    "decimal_precision": 34
+  },
+  "entities": ["A", "B", "C"],
+  "memberships": [
+    {"entity_id": "A", "first_session": "s0", "last_session": "s2", "known_at": "2026-01-04T12:00:00Z", "included": true},
+    {"entity_id": "B", "first_session": "s0", "last_session": "s2", "known_at": "2026-01-04T12:00:00Z", "included": true},
+    {"entity_id": "C", "first_session": "s0", "last_session": "s2", "known_at": "2026-01-04T12:00:00Z", "included": true},
+    {"entity_id": "A", "first_session": "s1", "last_session": "s2", "known_at": "2026-01-07T12:00:00Z", "included": false}
+  ],
+  "observations": [
+    {"entity_id": "A", "session_id": "s0", "revision": 1, "published_at": "2026-01-05T16:00:00Z", "arrived_at": "2026-01-05T16:05:00Z", "level": "11", "unit": "synthetic_level"},
+    {"entity_id": "A", "session_id": "s1", "revision": 1, "published_at": "2026-01-06T16:00:00Z", "arrived_at": "2026-01-06T16:45:00Z", "level": "50", "unit": "synthetic_level"},
+    {"entity_id": "A", "session_id": "s1", "revision": 2, "published_at": "2026-01-06T16:10:00Z", "arrived_at": "2026-01-06T16:15:00Z", "level": "10", "unit": "synthetic_level"},
+    {"entity_id": "A", "session_id": "s1", "revision": 3, "published_at": "2026-01-06T16:30:00Z", "arrived_at": "2026-01-07T10:00:00Z", "level": "900", "unit": "synthetic_level"},
+    {"entity_id": "B", "session_id": "s0", "revision": 1, "published_at": "2026-01-05T16:00:00Z", "arrived_at": "2026-01-05T16:05:00Z", "level": "10", "unit": "synthetic_level"},
+    {"entity_id": "B", "session_id": "s1", "revision": 1, "published_at": "2026-01-06T16:00:00Z", "arrived_at": "2026-01-06T16:05:00Z", "level": "10", "unit": "synthetic_level"},
+    {"entity_id": "C", "session_id": "s0", "revision": 1, "published_at": "2026-01-05T16:00:00Z", "arrived_at": "2026-01-05T16:05:00Z", "level": "9", "unit": "synthetic_level"},
+    {"entity_id": "C", "session_id": "s1", "revision": 1, "published_at": "2026-01-06T16:00:00Z", "arrived_at": "2026-01-06T16:05:00Z", "level": "10", "unit": "synthetic_level"},
+    {"entity_id": "A", "session_id": "s2", "revision": 1, "published_at": "2026-01-07T16:00:00Z", "arrived_at": "2026-01-07T16:05:00Z", "level": "500", "unit": "synthetic_level"}
+  ],
+  "decisions": [
+    {"entity_id": "A", "session_id": "s1", "at": "2026-01-06T17:00:00Z"},
+    {"entity_id": "B", "session_id": "s1", "at": "2026-01-06T17:00:00Z"},
+    {"entity_id": "C", "session_id": "s1", "at": "2026-01-06T17:00:00Z"}
+  ],
+  "labels": [
+    {"entity_id": "A", "decision_at": "2026-01-06T17:00:00Z", "available_at": "2026-01-07T17:00:00Z", "value": "4", "unit": "synthetic_target"},
+    {"entity_id": "B", "decision_at": "2026-01-06T17:00:00Z", "available_at": "2026-01-07T17:00:00Z", "value": "4", "unit": "synthetic_target"},
+    {"entity_id": "C", "decision_at": "2026-01-06T17:00:00Z", "available_at": "2026-01-07T17:00:00Z", "value": "4", "unit": "synthetic_target"}
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "metrics": {
+    "decisions": {"value": 3, "tolerance": 0},
+    "signals": {"value": 3, "tolerance": 0},
+    "pairs": {"value": 3, "tolerance": 0},
+    "coefficient": {"value": "1", "tolerance": "1e-30"},
+    "centered_cross": {"value": "2", "tolerance": "1e-30"},
+    "signal_variance": {"value": "2", "tolerance": "1e-30"},
+    "label_variance": {"value": "2", "tolerance": "1e-30"}
+  }
+}

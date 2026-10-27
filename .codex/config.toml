@@ -1,0 +1,13 @@
+developer_instructions = """
+For pstack in this repository, use .agents/pstack-models.md at the repository root as the model settings file. This replaces all reads, fallbacks, writes, and setup reruns that upstream skills direct to ~/.agents/pstack-models.md. Keep these preferences project-local.
+Each real role entry contains a model ID and a separate reasoning_effort value. Pass them separately to spawn_agent, with fork_turns="none" when overriding either. These panels use two models from one provider.
+"""
+
+[plugins."superpowers@openai-curated"]
+enabled = false
+
+[plugins."superpowers@openai-curated-remote"]
+enabled = false
+
+[plugins."superpowers@claude-plugins-official"]
+enabled = false

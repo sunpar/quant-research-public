@@ -1,0 +1,58 @@
+{
+    "realtime_start": "1776-07-04",
+    "realtime_end": "9999-12-31",
+    "observation_start": "1600-01-01",
+    "observation_end": "9999-12-31",
+    "units": "lin",
+    "output_type": 1,
+    "file_type": "json",
+    "order_by": "observation_date",
+    "sort_order": "asc",
+    "count": 7,
+    "offset": 0,
+    "limit": 100000,
+    "observations": [
+        {
+            "realtime_start": "2011-11-03",
+            "realtime_end": "9999-12-31",
+            "date": "1973-10-01",
+            "value": "0"
+        },
+        {
+            "realtime_start": "2011-11-03",
+            "realtime_end": "9999-12-31",
+            "date": "1974-01-01",
+            "value": "1"
+        },
+        {
+            "realtime_start": "2020-04-01",
+            "realtime_end": "2020-06-07",
+            "date": "2020-01-01",
+            "value": "0"
+        },
+        {
+            "realtime_start": "2020-06-08",
+            "realtime_end": "9999-12-31",
+            "date": "2020-01-01",
+            "value": "1"
+        },
+        {
+            "realtime_start": "2020-10-01",
+            "realtime_end": "2021-07-20",
+            "date": "2020-07-01",
+            "value": "1"
+        },
+        {
+            "realtime_start": "2021-07-21",
+            "realtime_end": "9999-12-31",
+            "date": "2020-07-01",
+            "value": "0"
+        },
+        {
+            "realtime_start": "2026-10-01",
+            "realtime_end": "9999-12-31",
+            "date": "2026-07-01",
+            "value": "0"
+        }
+    ]
+}
