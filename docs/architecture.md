@@ -219,6 +219,26 @@ make run ARGS='data status --root DATA_ROOT --query "unrate" --status approved'
 
 This local operator view reports recorded governance facts. Approval does not establish campaign eligibility, current provider permission, adapter compatibility, readable files, freshness, completeness, or row availability. Provider declarations remain visible after revocation. Status does not inspect dataset or object files, obtain the current time, or contact a provider. [D085](decisions.md#d085-inspect-recorded-data-status-without-changing-the-catalog) records this boundary.
 
+## Inspect one dataset's recorded history
+
+Use a name from `data status` to inspect every recorded event for that exact dataset:
+
+```sh
+make run ARGS='data history alfred.unrate --root DATA_ROOT'
+```
+
+`data history` reads the complete catalog and prints one JSON event array in the dataset's recorded append order. Equal timestamps retain that order. Each event includes `kind`, `dataset`, `actor`, and its UTC governance timestamp `at`.
+
+Documentation events retain `owner`, `fields`, `access`, `vintage`, `known_gaps`, `vintages`, and `approved_for`. Each vintage includes `aspect` and `evidence`, whose fields are `digest` and `summary`. Validation events retain `evidence`, approvals retain `adapter`, and revocations retain `reason`. Earlier documentation, validation references, and approval adapters remain visible after later events.
+
+Output uses two-space indentation, sorted object keys, and a final newline. Lookup is case-sensitive and preserves spaces in the supplied name. Unknown names, absent roots or catalogs, and empty catalogs exit 1 with `Data history failed: Unknown dataset 'NAME'` on stderr and no JSON output. A missing dataset argument or `--root` exits 2.
+
+The loader retains its existing behavior, including treating a dangling catalog symlink as an absent catalog. Loader-detected malformed, noncanonical, unsupported, or transition-invalid catalogs and read failures retain the same error prefix, before dataset lookup. Corruption elsewhere in the catalog can prevent inspection.
+
+The array projects the supplied catalog's recorded events for one dataset. It omits the portable catalog's schema version and global sequence and has no import contract. History inspects no evidence objects or vintage files, obtains no current time, contacts no provider, and writes no state.
+
+Evidence references do not establish that objects exist or support their recorded claims. This view proves neither immutable history nor complete historical disclosure and grants no agent access or scientific acceptance. [D089](decisions.md#d089-inspect-one-datasets-complete-recorded-history) records the decision and verification limits.
+
 ## Register the paper case
 
 The paper case's series are `alfred.<series>` datasets, so the same commands pull and ingest them by name:
