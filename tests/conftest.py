@@ -24,10 +24,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.fixture
 def cli():
-    def run(directory: Path, *arguments: str, success=True, text=True):
+    def run(directory: Path, *arguments: str, success=True, text=True, dependencies=False):
         bootstrap = (
             f"import runpy, sys; sys.path.append({str(ROOT / 'src')!r}); "
-            f"sys.argv = {['quant_research', *arguments]!r}; "
+            + (f"sys.path.extend({sys.path!r}); " if dependencies else "")
+            + f"sys.argv = {['quant_research', *arguments]!r}; "
             "runpy.run_module('quant_research', run_name='__main__')"
         )
         result = subprocess.run(

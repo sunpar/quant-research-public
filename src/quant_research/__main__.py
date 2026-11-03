@@ -86,9 +86,10 @@ def main() -> None:
     replay.add_argument("--attempt-id", type=UUID)
     replay.add_argument("--history", type=Path, action="append", default=[])
     replay.add_argument("--reason", help="Reason for a new trial's links to supplied history")
-    report = commands.add_parser("report", help="Write a Markdown report of a verified package")
+    report = commands.add_parser("report", help="Write a report of a verified package")
     report.add_argument("path", type=Path)
     report.add_argument("--output")
+    report.add_argument("--format", choices=("markdown", "html"), default="markdown")
     prospective_commands = commands.add_parser(
         "prospective", help="Register terminal packages and verify their prospective log"
     ).add_subparsers(dest="step", required=True)
@@ -418,6 +419,10 @@ def main() -> None:
             report = render_report(package)
         except PackageError as error:
             parser.exit(1, f"Cannot render report: {error}\n")
+        if args.format == "html":
+            from quant_research.report_html import render_html
+
+            report = render_html(report)
         if args.output is None:
             sys.stdout.buffer.write(report.encode())
             return

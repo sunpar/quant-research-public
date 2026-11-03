@@ -62,6 +62,22 @@ def _inline(value: str) -> str:
     return single_line(_MARKDOWN.sub(r"\\\g<0>", value))
 
 
+def _list_inline(value: str) -> str:
+    return re.sub(r"^( *(?:\d{1,9})?)([#.+)-])", r"\1\\\2", _inline(value))
+
+
+def _code(value: str) -> str:
+    value = single_line(value)
+    delimiter = "`" * (1 + max(map(len, re.findall(r"`+", value)), default=0))
+    if (
+        value.startswith("`")
+        or value.endswith("`")
+        or (value.startswith(" ") and value.endswith(" ") and value.strip(" "))
+    ):
+        value = f" {value} "
+    return f"{delimiter}{value}{delimiter}" if value else ""
+
+
 def _named(digest: str, artifacts: tuple[Artifact, ...]) -> str:
     names = [f"`{item.name}`" for item in artifacts if item.digest == digest]
     return f"`{digest}` ({'artifact' if len(names) == 1 else 'artifacts'} {', '.join(names)})"
@@ -214,26 +230,26 @@ def _campaign(snapshot: dict) -> list[str]:
     lines = [
         "## Campaign",
         "",
-        f"- Workflow: `{_inline(report['workflow_id'])}`, run `{_inline(report['run_id'])}`",
-        f"- Revision: `{report['revision']}`",
+        f"- Workflow: {_code(report['workflow_id'])}, run {_code(report['run_id'])}",
+        f"- Revision: {_code(report['revision'])}",
         f"- Campaign question: {_inline(snapshot['question'])}",
         f"- Snapshot: {_inline(snapshot['key'])}",
         f"- Research ending: {_inline(outcome)}",
         f"- Ending reason: {_inline(reason)}",
         f"- Steps: {len(report['steps'])}",
-        f"- Original numerical head: {snapshot['original_head'] or 'none'}",
-        f"- Recovery snapshot head: {snapshot['recovered_head'] or 'none'}",
+        f"- Original numerical head: {_inline(snapshot['original_head'] or 'none')}",
+        f"- Recovery snapshot head: {_inline(snapshot['recovered_head'] or 'none')}",
         f"- Human acceptance: {_inline(snapshot['acceptance'])}",
         "- Scope: provisional development evidence only; confirmation unavailable",
     ]
     if report["unrecorded"] is not None:
-        lines.append(f"- Pending unrecorded candidate: `{report['unrecorded']['trial']}`")
+        lines.append(f"- Pending unrecorded candidate: {_code(report['unrecorded']['trial'])}")
     if assessment is not None:
         lines.extend(
             [
                 f"- Original classification: {_inline(assessment['classification'])}",
                 f"- Assessment detail: {_inline(assessment['detail'])}",
-                f"- Independent critic: {str(assessment['independent']).lower()}",
+                f"- Independent critic: {_inline(str(assessment['independent']).lower())}",
             ]
         )
         for name in ("shortlist", "evidence", "conclusion", "critique"):
@@ -251,17 +267,18 @@ def _campaign(snapshot: dict) -> list[str]:
         event for event in json.loads(report["steering"])["events"] if event["actor"] != "runner"
     ]
     lines.extend(
-        f"- {_inline(event['action'])} by {_inline(event['actor'])}: {_inline(event['reason'])}"
+        f"- {_list_inline(event['action'])} by {_inline(event['actor'])}: "
+        f"{_inline(event['reason'])}"
         for event in events
     )
     decisions = snapshot["acceptance_decisions"]
     lines.extend(
-        f"- Accepted attempt `{decision['attempt']}` by {_inline(decision['actor'])}: "
-        f"{_inline(decision['reason'])}, at `{decision['at']}`"
+        f"- Accepted attempt {_code(decision['attempt'])} by {_inline(decision['actor'])}: "
+        f"{_inline(decision['reason'])}, at {_code(decision['at'])}"
         + (
             ""
             if decision["supersedes"] is None
-            else f", supersedes attempt `{decision['supersedes']}`"
+            else f", supersedes attempt {_code(decision['supersedes'])}"
         )
         for decision in decisions
     )
@@ -269,7 +286,7 @@ def _campaign(snapshot: dict) -> list[str]:
         lines.append("No steering decisions from actors other than runner were recorded.")
     lines.extend(["", "### Model cutoff checks", ""])
     lines.extend(
-        f"- {_inline(check['period'])}: {_inline(check['sentence'])}"
+        f"- {_list_inline(check['period'])}: {_inline(check['sentence'])}"
         for check in snapshot["cutoff_checks"]
     )
     if not snapshot["cutoff_checks"]:
