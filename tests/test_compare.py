@@ -1,17 +1,27 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import shutil
 from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from fractions import Fraction
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
-from quant_research.compare import CompareError, Metric, Row, compare_packages, render_comparison
+from quant_research.compare import (
+    CompareError,
+    Comparison,
+    Identity,
+    Metric,
+    Row,
+    compare_packages,
+    render_comparison,
+    render_comparison_json,
+)
 from quant_research.evaluation import VERSION, Evaluation, Interval, Invalid, Profile
 from quant_research.packages import (
     ArtifactInput,
@@ -158,6 +168,136 @@ def sections(stdout: str) -> dict[str, list[str]]:
     return {lines[0]: lines[1:] for lines in (block.split("\n") for block in blocks)}
 
 
+def test_json_schema_preserves_exact_values_types_marks_and_order():
+    first, second = UUID(int=1), UUID(int=2)
+    raw = 'line\r\n\t\x1b\x00é "quoted" \\n'
+    comparison = Comparison(
+        Identity("a" * 64, first, second, "c" * 64),
+        Identity("b" * 64, second, first, "d" * 64),
+        specification=(Row("zeta", raw, raw), Row("alpha", "old", "new")),
+        inputs=(Row("left", "", None), Row("right", None, "B")),
+        versions=(Row("version", "v1", "v1"),),
+        outcome=(Row("detail\nraw", "failed", "successful"),),
+        metrics=(
+            Metric("count", Decimal(3), Decimal(7)),
+            Metric("scale", Decimal("1.00"), Decimal("1.0")),
+            Metric("precision", Decimal("1E-31"), Decimal("1234567890123456789012345678901234")),
+            Metric("only A", Decimal("0.30000000000000004"), None),
+            Metric("only B", None, Decimal("1E-30")),
+            Metric("exponent", Decimal("1E+30"), Decimal("2E+30")),
+            Metric("signed zero", Decimal("-0.00"), Decimal("-0.0")),
+        ),
+        relation="linked",
+        shared_trials=(second, first),
+    )
+    rendered = render_comparison_json(comparison)
+    document = json.loads(rendered)
+    assert set(document) == {
+        "schema_version",
+        "a",
+        "b",
+        "specification",
+        "inputs",
+        "versions",
+        "outcome",
+        "metrics",
+        "difference_count",
+        "relation",
+        "shared_trials",
+    }
+    assert type(document["schema_version"]) is int and document["schema_version"] == 1
+    assert type(document["difference_count"]) is int and document["difference_count"] == 9
+    assert document["a"] == {
+        "package": "a" * 64,
+        "trial_id": "00000000-0000-0000-0000-000000000001",
+        "lineage_id": "00000000-0000-0000-0000-000000000002",
+        "spec_id": "c" * 64,
+    }
+    assert document["b"] == {
+        "package": "b" * 64,
+        "trial_id": "00000000-0000-0000-0000-000000000002",
+        "lineage_id": "00000000-0000-0000-0000-000000000001",
+        "spec_id": "d" * 64,
+    }
+    assert document["relation"] == "linked"
+    assert document["shared_trials"] == [
+        "00000000-0000-0000-0000-000000000002",
+        "00000000-0000-0000-0000-000000000001",
+    ]
+    assert document["specification"] == [
+        {"name": "zeta", "a": raw, "b": raw, "mark": "same"},
+        {"name": "alpha", "a": "old", "b": "new", "mark": "different"},
+    ]
+    assert document["inputs"] == [
+        {"name": "left", "a": "", "b": None, "mark": "only in A"},
+        {"name": "right", "a": None, "b": "B", "mark": "only in B"},
+    ]
+    assert document["versions"] == [{"name": "version", "a": "v1", "b": "v1", "mark": "same"}]
+    assert document["outcome"] == [
+        {"name": "detail\nraw", "a": "failed", "b": "successful", "mark": "different"}
+    ]
+    assert [
+        (row["name"], row["a"], row["b"], row["mark"], row["difference"])
+        for row in document["metrics"]
+    ] == [
+        ("count", "3", "7", "different", "4"),
+        ("scale", "1.00", "1.0", "same", "0.00"),
+        (
+            "precision",
+            "1E-31",
+            "1234567890123456789012345678901234",
+            "different",
+            "1234567890123456789012345678901233.9999999999999999999999999999999",
+        ),
+        ("only A", "0.30000000000000004", None, "only in A", None),
+        ("only B", None, "1E-30", "only in B", None),
+        ("exponent", "1E+30", "2E+30", "different", "1E+30"),
+        ("signed zero", "-0.00", "-0.0", "same", "0.00"),
+    ]
+    for section in ("specification", "inputs", "versions", "outcome", "metrics"):
+        assert type(document[section]) is list
+        for row in document[section]:
+            assert set(row) == {"name", "a", "b", "mark"} | (
+                {"difference"} if section == "metrics" else set()
+            )
+            assert type(row["name"]) is type(row["mark"]) is str
+            assert row["a"] is None or type(row["a"]) is str
+            assert row["b"] is None or type(row["b"]) is str
+    for row in document["metrics"]:
+        difference = row["difference"]
+        assert difference is None or type(difference) is str
+        if difference is not None:
+            assert Fraction(difference) == Fraction(row["b"]) - Fraction(row["a"])
+    assert rendered == render_comparison_json(comparison)
+    assert rendered == json.dumps(document, indent=2, sort_keys=True) + "\n"
+    assert rendered.endswith("}\n") and not rendered.endswith("\n\n")
+    assert "é" not in rendered and "\\u00e9" in rendered
+
+
+def test_json_zero_difference_count_does_not_assert_package_identity(tmp_path, cli):
+    a, b = save(tmp_path, trial()), save(tmp_path, trial())
+    result = cli(tmp_path, "compare", str(a.path), str(b.path), "--format", "json")
+    document = json.loads(result.stdout)
+    assert document["difference_count"] == 0
+    assert document["a"]["package"] != document["b"]["package"]
+    assert document["a"]["trial_id"] != document["b"]["trial_id"]
+    assert document["a"]["lineage_id"] != document["b"]["lineage_id"]
+    assert document["relation"] == "unrelated" and document["shared_trials"] == []
+    assert document["metrics"] == []
+    default = cli(tmp_path, "compare", str(a.path), str(b.path), text=False)
+    explicit = cli(tmp_path, "compare", str(a.path), str(b.path), "--format", "text", text=False)
+    assert default.stdout == explicit.stdout == render_comparison(compare_packages(a, b)).encode()
+    assert result.stderr == "" and default.stderr == explicit.stderr == b""
+
+
+def test_compare_format_help_and_invalid_choice_precede_package_reads(tmp_path, cli):
+    assert "--format {text,json}" in cli(tmp_path, "compare", "--help").stdout
+    result = cli(tmp_path, "compare", "missing-a", "missing-b", "--format", "yaml", success=False)
+    assert (result.returncode, result.stdout) == (2, "")
+    assert "--format" in result.stderr and "invalid choice: 'yaml'" in result.stderr
+    assert "Package verification failed" not in result.stderr
+
+
 @pytest.mark.smoke
 def test_package_against_itself_marks_every_row_same(tmp_path, cli):
     package = replay(tmp_path)
@@ -218,8 +358,9 @@ def test_known_answer_against_null_differs_in_exactly_the_changed_fields(tmp_pat
 
 
 @pytest.mark.parametrize("selected", [True, False])
+@pytest.mark.parametrize("format_args", [(), ("--format", "text"), ("--format", "json")])
 def test_output_is_byte_identical_across_runs_copies_and_paths(
-    tmp_path, cli, linked_history, pilot_results, selected
+    tmp_path, cli, linked_history, pilot_results, selected, format_args
 ):
     trials, artifacts = linked_history
     amended = []
@@ -259,6 +400,8 @@ def test_output_is_byte_identical_across_runs_copies_and_paths(
             "pilot-a",
             "--evaluation-b",
             "pilot-b",
+            *format_args,
+            text=False,
         ).stdout
         for first in (str(package.path), str(package.path), str(copy), relative)
     }
@@ -281,14 +424,30 @@ def test_output_is_byte_identical_across_runs_copies_and_paths(
     assert comparison.metrics[1] == Metric("pilot trial count", Decimal(7), Decimal(11))
     assert Row("pilot artifact", "pilot-a", "pilot-b") in comparison.outcome
     assert (comparison.relation, comparison.shared_trials) == ("linked", (trials[0].trial_id,))
-    assert outputs == {render_comparison(comparison)}
+    renderer = render_comparison_json if format_args == ("--format", "json") else render_comparison
+    assert outputs == {renderer(comparison).encode()}
+    if format_args == ("--format", "json"):
+        document = json.loads(next(iter(outputs)))
+        assert document["a"]["trial_id"] == str(trials[0].trial_id)
+        assert document["b"]["trial_id"] == str(trials[1].trial_id)
+        assert document["metrics"][:2] == [
+            {"name": "pairs", "a": "11", "b": "22", "mark": "different", "difference": "11"},
+            {
+                "name": "pilot trial count",
+                "a": "7",
+                "b": "11",
+                "mark": "different",
+                "difference": "4",
+            },
+        ]
+        assert document["metrics"][3]["difference"] == "0.20000000000000004"
     assert (comparison.a.trial_id, comparison.b.trial_id) == (
         trials[0].trial_id,
         trials[1].trial_id,
     )
     (stdout,) = outputs
-    assert str(tmp_path) not in stdout
-    assert relative not in stdout
+    assert str(tmp_path).encode() not in stdout
+    assert relative.encode() not in stdout
     assert (package.record, package.digest) == (record, digest)
     for path in (package.path, copy):
         reopened = open_package(path)
@@ -354,7 +513,10 @@ def test_explicit_middle_trial_keeps_all_of_its_ancestors(tmp_path, linked_histo
 
 
 @pytest.mark.parametrize("side", ["a", "b"])
-def test_one_explicit_trial_keeps_the_other_sides_selection(tmp_path, cli, linked_history, side):
+@pytest.mark.parametrize("output_format", ["text", "json"])
+def test_one_explicit_trial_keeps_the_other_sides_selection(
+    tmp_path, cli, linked_history, side, output_format
+):
     trials, artifacts = linked_history
     package = save(tmp_path, *trials, artifacts=artifacts)
     comparison = compare_packages(package, package, **{f"trial_{side}": trials[0].trial_id})
@@ -372,15 +534,18 @@ def test_one_explicit_trial_keeps_the_other_sides_selection(tmp_path, cli, linke
         str(package.path),
         f"--trial-{side}",
         str(trials[0].trial_id),
+        "--format",
+        output_format,
     )
-    assert result.stdout == render_comparison(comparison)
+    renderer = render_comparison_json if output_format == "json" else render_comparison
+    assert result.stdout == renderer(comparison)
 
 
-@pytest.mark.parametrize("corrupt", [0, 1])
-def test_corrupt_package_in_either_position_prints_nothing(tmp_path, cli, corrupt):
+@pytest.mark.parametrize("corrupt, format_args", [(0, ()), (1, ()), (0, ("--format", "json"))])
+def test_corrupt_package_in_either_position_prints_nothing(tmp_path, cli, corrupt, format_args):
     paths = [replay(tmp_path, "known-answer").path, replay(tmp_path, "null").path]
     (paths[corrupt] / "manifest.sha256").write_text("0" * 64 + "\n")
-    result = cli(tmp_path, "compare", *map(str, paths), success=False)
+    result = cli(tmp_path, "compare", *map(str, paths), *format_args, success=False)
     assert (result.returncode, result.stdout) == (1, "")
     assert str(paths[corrupt]) in result.stderr
     assert "Manifest hash does not match manifest.sha256" in result.stderr
@@ -427,6 +592,10 @@ def test_free_text_renders_on_one_line_with_control_characters_escaped(tmp_path,
         f"{INDENT}A: {SPEC.question}",
         f"{INDENT}B: Does the level difference hold?\\x1b",
     ]
+    document = json.loads(
+        cli(tmp_path, "compare", str(a.path), str(b.path), "--format", "json").stdout
+    )
+    assert document["specification"][0]["b"] == "Does the level\r\ndifference\nhold?\x1b"
 
 
 def test_trial_without_attempts_shows_only_its_attempt_count(tmp_path):
@@ -449,8 +618,10 @@ def test_outcome_uses_the_last_supplied_attempt(tmp_path):
     assert [(row.name, row.a, row.b) for row in differences] == [("attempts", "2", "1")]
 
 
-@pytest.mark.parametrize("side", ["A", "B"])
-def test_a_package_without_a_selected_trial_is_refused_naming_its_side(tmp_path, cli, side):
+@pytest.mark.parametrize("side, format_args", [("A", ()), ("B", ()), ("B", ("--format", "json"))])
+def test_a_package_without_a_selected_trial_is_refused_naming_its_side(
+    tmp_path, cli, side, format_args
+):
     selected = save(tmp_path, trial())
     unselected = save_package(
         tmp_path / "unselected", replace(selected.record, trial_id=None), ARTIFACTS
@@ -466,13 +637,15 @@ def test_a_package_without_a_selected_trial_is_refused_naming_its_side(tmp_path,
     with pytest.raises(CompareError) as error:
         compare_packages(a, b, **{f"trial_{'b' if side == 'A' else 'a'}": selected.record.trial_id})
     assert str(error.value) == reason
-    result = cli(tmp_path, "compare", str(a.path), str(b.path), success=False)
+    result = cli(tmp_path, "compare", str(a.path), str(b.path), *format_args, success=False)
     assert (result.returncode, result.stdout) == (1, "")
     assert result.stderr == f"Comparison failed: {reason}\n"
 
 
-@pytest.mark.parametrize("side", ["a", "b"])
-def test_explicit_uuid_must_belong_to_its_own_side(tmp_path, cli, linked_history, side):
+@pytest.mark.parametrize("side, format_args", [("a", ()), ("b", ()), ("a", ("--format", "json"))])
+def test_explicit_uuid_must_belong_to_its_own_side(
+    tmp_path, cli, linked_history, side, format_args
+):
     trials, artifacts = linked_history
     history = save(tmp_path, *trials, artifacts=artifacts)
     other = save(tmp_path, trial())
@@ -489,6 +662,7 @@ def test_explicit_uuid_must_belong_to_its_own_side(tmp_path, cli, linked_history
         str(b.path),
         f"--trial-{side}",
         str(requested),
+        *format_args,
         success=False,
     )
     assert (result.returncode, result.stdout, result.stderr) == (
@@ -544,23 +718,28 @@ def test_metric_difference_is_exact_beyond_default_decimal_precision():
 
 
 @pytest.mark.parametrize(
-    "content, reason",
+    "content, reason, format_args",
     [
-        (b"not json\n", "is not JSON"),
-        (b"[" * 100_000 + b"]" * 100_000, "is not JSON"),
-        (b"[3]\n", "is not a JSON object"),
-        (b'{"pairs": "abc"}\n', "has pairs 'abc'"),
-        (b'{"coefficient": "NaN"}\n', "has coefficient 'NaN'"),
-        (b'{"pairs": 0.5}\n', "has pairs 0.5"),
+        (b"not json\n", "is not JSON", ()),
+        (b"[" * 100_000 + b"]" * 100_000, "is not JSON", ()),
+        (b"[3]\n", "is not a JSON object", ()),
+        (b'{"pairs": "abc"}\n', "has pairs 'abc'", ()),
+        (b'{"coefficient": "NaN"}\n', "has coefficient 'NaN'", ()),
+        (b'{"pairs": 0.5}\n', "has pairs 0.5", ()),
+        (b'{"pairs": 0.5}\n', "has pairs 0.5", ("--format", "json")),
     ],
 )
-def test_diagnostic_outside_its_profile_is_refused_with_the_reason(tmp_path, cli, content, reason):
+def test_diagnostic_outside_its_profile_is_refused_with_the_reason(
+    tmp_path, cli, content, reason, format_args
+):
     artifacts = (*ARTIFACTS[:-1], replace(ARTIFACTS[-1], data=content))
     declared = trial(replace(SPEC, evaluation_profile=EVALUATION_PROFILE))
     package = save(tmp_path, declared, artifacts=artifacts)
     with pytest.raises(CompareError, match=reason):
         compare_packages(package, package)
-    result = cli(tmp_path, "compare", str(package.path), str(package.path), success=False)
+    result = cli(
+        tmp_path, "compare", str(package.path), str(package.path), *format_args, success=False
+    )
     assert (result.returncode, result.stdout) == (1, "")
     assert result.stderr.startswith("Comparison failed: Diagnostic 'result' in ")
     assert reason in result.stderr
@@ -646,7 +825,10 @@ def test_pilot_ambiguity_is_sorted_and_explicit_choice_ignores_malformed_sibling
         with pytest.raises(CompareError) as error:
             compare_packages(a, b)
         assert str(error.value) == reason
-        refused = cli(tmp_path, "compare", str(a.path), str(b.path), success=False)
+        output_format = "json" if side == "b" else "text"
+        refused = cli(
+            tmp_path, "compare", str(a.path), str(b.path), "--format", output_format, success=False
+        )
         assert (refused.returncode, refused.stdout, refused.stderr) == (
             1,
             "",
@@ -655,9 +837,17 @@ def test_pilot_ambiguity_is_sorted_and_explicit_choice_ignores_malformed_sibling
         comparison = compare_packages(a, b, **{f"evaluation_{side}": "pilot-a"})
         projections.append((comparison.outcome, comparison.metrics))
         result = cli(
-            tmp_path, "compare", str(a.path), str(b.path), f"--evaluation-{side}", "pilot-a"
+            tmp_path,
+            "compare",
+            str(a.path),
+            str(b.path),
+            f"--evaluation-{side}",
+            "pilot-a",
+            "--format",
+            output_format,
         )
-        assert result.stdout == render_comparison(comparison)
+        renderer = render_comparison_json if output_format == "json" else render_comparison
+        assert result.stdout == renderer(comparison)
     assert projections[0] == projections[1]
 
 
@@ -691,6 +881,8 @@ def test_pilot_choices_must_belong_to_the_chosen_trials_last_attempt(
             str(chosen.trial_id),
             f"--evaluation-{side}",
             name,
+            "--format",
+            "json" if side == "b" else "text",
             success=False,
         )
         assert (refused.returncode, refused.stdout, refused.stderr) == (
@@ -781,12 +973,15 @@ def test_selected_pilot_decode_and_post_open_integrity_errors_remain_package_err
     package = save(tmp_path, trial(results=("malformed",)), artifacts=(*ARTIFACTS, malformed))
     with pytest.raises(PackageError, match="evaluation") as error:
         compare_packages(package, package)
-    result = cli(tmp_path, "compare", str(package.path), str(package.path), success=False)
-    assert (result.returncode, result.stdout, result.stderr) == (
-        1,
-        "",
-        f"Package verification failed: {error.value}\n",
-    )
+    for format_args in ((), ("--format", "json")):
+        result = cli(
+            tmp_path, "compare", str(package.path), str(package.path), *format_args, success=False
+        )
+        assert (result.returncode, result.stdout, result.stderr) == (
+            1,
+            "",
+            f"Package verification failed: {error.value}\n",
+        )
     for changed in ("artifact", "manifest"):
         package = save(
             tmp_path / changed, trial(results=("pilot-a",)), artifacts=(*ARTIFACTS, *pilot_results)

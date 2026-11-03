@@ -135,7 +135,10 @@ The report shows the selected question, trial specifications, every attempt's st
 ```sh
 quant-research compare PACKAGE_A PACKAGE_B \
   --trial-a TRIAL_A_UUID --trial-b TRIAL_B_UUID
+quant-research compare PACKAGE_A PACKAGE_B --format json
 ```
+
+`--format text` is the default. `--format json` writes one schema 1 document to standard output with exact decimal strings and ordered row arrays. Python callers render the same `Comparison` through `render_comparison` or `render_comparison_json`. [D088](decisions.md#d088-render-existing-comparisons-as-versioned-json) defines the JSON fields, types, and count semantics. Both formats use one comparison and preserve the existing refusal messages and exit codes. Different rows remain a successful comparison with exit code 0.
 
 Python callers pass the same choices as keyword-only `trial_a` and `trial_b` UUIDs to `compare_packages`. An omitted trial selector refuses a package that selects no trial. An explicit UUID absent from its own package refuses with the side and UUID named. Comparison preserves package selection, bytes, digest, and history. Outcome and metrics use each compared trial's last supplied attempt. [D082](decisions.md#d082-compare-explicitly-chosen-trials-without-changing-package-selection) amends the original [D034 comparison rules](decisions.md#d034-compare-the-selected-trials-of-two-verified-packages).
 
