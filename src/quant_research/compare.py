@@ -372,3 +372,52 @@ def render_comparison(comparison: Comparison) -> str:
     shared = ", ".join(str(trial) for trial in comparison.shared_trials) or "none"
     lines += ["", "Lineage", f"  relation: {comparison.relation}", f"  shared trials: {shared}"]
     return "\n".join(lines) + "\n"
+
+
+def render_comparison_json(comparison: Comparison) -> str:
+    """Render schema 1 JSON with exact decimal strings and one final newline.
+
+    Args:
+        comparison (Comparison): Result of `compare_packages`.
+
+    Returns:
+        (str) JSON preserving row order, raw text, and computed comparison values.
+    """
+    metrics = []
+    for metric in comparison.metrics:
+        difference = metric.difference
+        metrics.append(
+            {
+                "name": metric.name,
+                "a": str(metric.a) if metric.a is not None else None,
+                "b": str(metric.b) if metric.b is not None else None,
+                "mark": metric.mark,
+                "difference": str(difference) if difference is not None else None,
+            }
+        )
+    payload = {
+        "schema_version": 1,
+        **{
+            side: {
+                "package": identity.package,
+                "trial_id": str(identity.trial_id),
+                "lineage_id": str(identity.lineage_id),
+                "spec_id": identity.spec_id,
+            }
+            for side, identity in (("a", comparison.a), ("b", comparison.b))
+        },
+        **{
+            section: [{"name": row.name, "a": row.a, "b": row.b, "mark": row.mark} for row in rows]
+            for section, rows in (
+                ("specification", comparison.specification),
+                ("inputs", comparison.inputs),
+                ("versions", comparison.versions),
+                ("outcome", comparison.outcome),
+            )
+        },
+        "metrics": metrics,
+        "difference_count": len(comparison.differences),
+        "relation": comparison.relation,
+        "shared_trials": [str(trial) for trial in comparison.shared_trials],
+    }
+    return json.dumps(payload, indent=2, sort_keys=True) + "\n"

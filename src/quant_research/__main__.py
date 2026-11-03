@@ -21,7 +21,12 @@ from quant_research.accounting import json_default as ledger_json
 from quant_research.backtest import BacktestError
 from quant_research.campaigns import CampaignRevision, parse_file
 from quant_research.catalog import CatalogError, Status
-from quant_research.compare import CompareError, compare_packages, render_comparison
+from quant_research.compare import (
+    CompareError,
+    compare_packages,
+    render_comparison,
+    render_comparison_json,
+)
 from quant_research.confirmation import Period
 from quant_research.datasets import DatasetError, ReadRecord, Refused
 from quant_research.packages import open_package, parse_outcome
@@ -56,6 +61,7 @@ def main() -> None:
     compare = commands.add_parser("compare", help="Compare two verified packages")
     compare.add_argument("a", type=Path, metavar="package-a")
     compare.add_argument("b", type=Path, metavar="package-b")
+    compare.add_argument("--format", choices=("text", "json"), default="text")
     compare.add_argument(
         "--trial-a",
         type=UUID,
@@ -401,7 +407,8 @@ def main() -> None:
             parser.exit(1, f"Package verification failed: {error}\n")
         except CompareError as error:
             parser.exit(1, f"Comparison failed: {error}\n")
-        sys.stdout.buffer.write(render_comparison(comparison).encode())
+        renderer = render_comparison_json if args.format == "json" else render_comparison
+        sys.stdout.buffer.write(renderer(comparison).encode())
         return
     try:
         package = open_package(args.path)
