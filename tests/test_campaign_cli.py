@@ -174,6 +174,8 @@ def steered(parent: CampaignRevision) -> CampaignRevision:
         ("status", CAMPAIGN),
         ("pause", CAMPAIGN, "--reason", "Hold"),
         ("resume", CAMPAIGN, "--actor", "sundeep"),
+        ("annotate", CAMPAIGN, "--reason", "Note"),
+        ("annotate", CAMPAIGN, "--actor", "sundeep"),
         ("start", "revision.json", "--task-queue", "research", "--label", "confirmation"),
         ("status", CAMPAIGN, "--call-log", "calls", *DECLARED),
         ("steer", "revision.json", "--actor", "sundeep"),
@@ -186,6 +188,8 @@ def steered(parent: CampaignRevision) -> CampaignRevision:
         "no call log",
         "no actor",
         "no reason",
+        "annotation without actor",
+        "annotation without reason",
         "start declares",
         "status declares",
         "steer names an actor",
@@ -229,6 +233,7 @@ def test_a_revision_that_cannot_be_read_or_parsed_fails_before_temporal(
             "Invalid canonical --available-at time",
         ),
         ("cancel", ("--available-at", "soon"), "Invalid --available-at time"),
+        ("annotate", ("--available-at", "2025-01-01"), "Invalid canonical --available-at time"),
         (
             "steer",
             ("--label", "confirmation"),
@@ -240,7 +245,7 @@ def test_a_revision_that_cannot_be_read_or_parsed_fails_before_temporal(
             "--label and --approved-for declare text only beside --available-at",
         ),
     ],
-    ids=["date", "offset", "word", "label alone", "provider alone"],
+    ids=["date", "offset", "word", "annotation date", "label alone", "provider alone"],
 )
 def test_a_declaration_needs_canonical_utc_time_before_its_labels_count(
     tmp_path, cli, setup, step, declaration, reason
@@ -275,7 +280,9 @@ def test_status_refuses_a_call_log_it_cannot_replay(tmp_path, cli, log):
 
 
 @pytest.mark.smoke
-@pytest.mark.parametrize("step", ["start", "status", "pause", "resume", "cancel", "steer"])
+@pytest.mark.parametrize(
+    "step", ["start", "status", "pause", "resume", "cancel", "annotate", "steer"]
+)
 def test_every_valid_command_loads_temporal_only_after_its_checks(tmp_path, cli, setup, step):
     parent = pilot(setup)
     first, child = (save_revision(tmp_path / "campaigns", r) for r in (parent, steered(parent)))
@@ -613,9 +620,143 @@ def test_an_unreachable_temporal_fails_with_its_address(tmp_path):
     )
 
 
-def test_the_cli_drives_a_loop_through_every_command_and_reconciles_its_receipts(
-    temporal, tmp_path, setup
+def test_cli_annotations_preserve_control_state_and_disclose_only_declared_notes(
+    temporal, tmp_path, setup, monkeypatch
 ):
+    revision = pilot(setup)
+    path = save_revision(tmp_path / "campaigns", revision)
+    campaign_id, queue = str(revision.campaign_id), str(uuid4())
+    calls = tmp_path / "calls"
+    calls.mkdir()
+    provider = ScriptedProvider([STOP, STOP])
+    gateway = Gateway(CallLog(calls), [(POLICY, provider)])
+    entered, release = threading.Event(), threading.Event()
+    complete = provider.complete
+
+    def first_reply(request, cancel):
+        reply = complete(request, cancel)
+        if len(provider.calls) == 1:
+            entered.set()
+            assert release.wait(60)
+        return reply
+
+    monkeypatch.setattr(provider, "complete", first_reply)
+    notes = (
+        ("running-auditor", "UNDECLARED running annotation", ()),
+        ("running-researcher", "Check the running evidence", DECLARED),
+        ("paused-auditor", "UNDECLARED paused annotation", ()),
+        ("paused-researcher", "Check the paused evidence", DECLARED),
+    )
+    stable = ("state", "paused_by", "revision", "steps")
+
+    async def run(*arguments: str) -> dict:
+        result = await asyncio.to_thread(campaign, tmp_path, *arguments, "--address", temporal)
+        assert result.returncode == 0, result.stdout + result.stderr
+        return json.loads(result.stdout)
+
+    async def held(handle, step: int) -> None:
+        expected = f"runner: Checkpoint before conclude holds step {step}"
+        while (await research.status(handle)).paused_by != expected:
+            await asyncio.sleep(0.05)
+
+    async def body() -> None:
+        client = await Client.connect(temporal)
+        handle = client.get_workflow_handle_for(research.ResearchLoop.run, campaign_id)
+        async with research.worker(
+            client,
+            queue,
+            gateway,
+            partial(resolve, setup=setup),
+            archive=research.CampaignArchive(tmp_path / "archive", calls),
+        ):
+            try:
+                await run("start", str(path), "--task-queue", queue)
+                assert await asyncio.to_thread(entered.wait, 10)
+                for state, entries in (("running", notes[:2]), ("paused", notes[2:])):
+                    for actor, reason, declaration in entries:
+                        before = await run("status", campaign_id, "--call-log", str(calls))
+                        assert {key: before[key] for key in stable} == {
+                            "state": state,
+                            "paused_by": None
+                            if state == "running"
+                            else "runner: Checkpoint before conclude holds step 1",
+                            "revision": revision.revision_id,
+                            "steps": [],
+                        }
+                        assert len(provider.calls) == 1
+                        annotated = await run(
+                            "annotate",
+                            campaign_id,
+                            "--actor",
+                            actor,
+                            "--reason",
+                            reason,
+                            *declaration,
+                        )
+                        assert annotated == {"campaign_id": campaign_id, "state": state}
+                        assert len(provider.calls) == 1
+                        after = await run("status", campaign_id, "--call-log", str(calls))
+                        assert {key: after[key] for key in stable} == {
+                            key: before[key] for key in stable
+                        }
+                        assert len(provider.calls) == 1
+                    if state == "running":
+                        release.set()
+                        await held(handle, 1)
+            finally:
+                release.set()
+
+            assert len(provider.calls) == 1
+            resumed = await run(
+                "resume", campaign_id, "--actor", "sundeep", "--reason", "UNDECLARED resume"
+            )
+            assert resumed == {"campaign_id": campaign_id, "state": "running"}
+            await held(handle, 2)
+            report = await run("status", campaign_id, "--call-log", str(calls))
+            assert [
+                (step["action"], step["result"], step["revision"]) for step in report["steps"]
+            ] == [("stop", "set_aside", revision.revision_id)]
+            assert len(provider.calls) == 2
+            for text in (
+                "Researcher annotate: Check the running evidence",
+                "Researcher annotate: Check the paused evidence",
+            ):
+                assert text not in provider.calls[0].texts
+                assert text in provider.calls[1].texts
+            assert not any(
+                "UNDECLARED" in text for request in provider.calls for text in request.texts
+            )
+            cancelled = await run(
+                "cancel", campaign_id, "--actor", "sundeep", "--reason", "UNDECLARED cancel"
+            )
+            assert cancelled == {"campaign_id": campaign_id, "state": "cancelled"}
+            closed = await research.record(handle)
+            annotations = [
+                event
+                for event in json.loads(closed.steering)["events"]
+                if event["action"] == "annotate"
+            ]
+            assert [
+                (event["action"], event["actor"], event["reason"]) for event in annotations
+            ] == [
+                ("annotate", "running-auditor", "UNDECLARED running annotation"),
+                ("annotate", "running-researcher", "Check the running evidence"),
+                ("annotate", "paused-auditor", "UNDECLARED paused annotation"),
+                ("annotate", "paused-researcher", "Check the paused evidence"),
+            ]
+            assert "restrictions" not in annotations[0]
+            assert "restrictions" not in annotations[2]
+            for event in (annotations[1], annotations[3]):
+                assert event["restrictions"] == {
+                    "available_at": "2025-01-01T00:00:00Z",
+                    "labels": [],
+                    "approved_for": ["codex-subscription"],
+                }
+
+    asyncio.run(asyncio.wait_for(body(), 120))
+
+
+def test_the_cli_drives_a_loop_lifecycle_and_reconciles_its_receipts(temporal, tmp_path, setup):
     parent, other = pilot(setup), pilot(setup)
     child = steered(parent)
     first, second = (save_revision(tmp_path / "campaigns", r) for r in (parent, child))

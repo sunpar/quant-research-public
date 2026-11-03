@@ -38,6 +38,7 @@ from quant_research.records import (
 )
 from quant_research.replay import NewTrial, Repeat, ReplayError, Retry, replay_fixture
 from quant_research.report import render_report
+from quant_research.steering import Command as _Action
 from quant_research.steering import check_revision_size
 
 
@@ -445,7 +446,6 @@ def main() -> None:
     )
 
 
-type _Action = Literal["pause", "resume", "cancel"]
 CONTROLS = get_args(_Action.__value__)
 
 
@@ -461,8 +461,6 @@ class _Start:
 
 @dataclass(frozen=True)
 class _Control:
-    """A pause, resume, or cancel, whose reason reaches a model only under restrictions (D063)."""
-
     campaign_id: UUID
     action: _Action
     actor: str
