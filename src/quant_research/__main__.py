@@ -563,9 +563,16 @@ def _prospective(parser: argparse.ArgumentParser, args: argparse.Namespace) -> N
             result = asdict(event)
         elif args.step == "register":
             registration = prospective.register_package(args.root, open_package(args.path))
-            result = {"registration_id": registration.registration_id, **asdict(registration)}
+            result = {
+                "registration_id": registration.registration_id,
+                "procedure_id": registration.procedure.identity,
+                **asdict(registration),
+            }
         else:
-            result = [asdict(entry) for entry in prospective.load_log(args.root).report()]
+            result = [
+                {**asdict(entry), "procedure_id": entry.registration.procedure.identity}
+                for entry in prospective.load_log(args.root).report()
+            ]
     except (ValueError, OSError, RecursionError) as error:
         parser.exit(1, f"Prospective command failed: {error}\n")
     print(json.dumps(result, default=prospective.json_default, indent=2, sort_keys=True))
