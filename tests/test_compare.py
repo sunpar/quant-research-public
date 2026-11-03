@@ -12,6 +12,7 @@ from uuid import uuid4
 import pytest
 
 from quant_research.compare import CompareError, Metric, Row, compare_packages, render_comparison
+from quant_research.evaluation import VERSION, Evaluation, Interval, Invalid, Profile
 from quant_research.packages import (
     ArtifactInput,
     EnvironmentRecord,
@@ -24,6 +25,8 @@ from quant_research.packages import (
     open_package,
     save_package,
 )
+from quant_research.records import PackageError, canonical_bytes
+from quant_research.reference import EVALUATION_ROLE, encode_evaluation
 from quant_research.replay import EVALUATION_PROFILE, NewTrial, Repeat, replay_fixture
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,6 +60,15 @@ SPEC = Specification(
         "cpython", "3.12.13", "cpython-312", "test-platform", "uv test", DIGESTS["lock"]
     ),
 )
+PILOT = Evaluation(
+    "above_minimum",
+    7,
+    0.975,
+    Interval(0.1, 1e-30, -0.2, 0.30000000000000004),
+    Interval(0.01, 0.002, -0.003, 0.04),
+    (0.12, 0.13),
+    Profile(0.005, 2, 0.05),
+)
 
 
 def replay(tmp_path: Path, fixture="known-answer", intent=None):
@@ -68,10 +80,10 @@ def replay(tmp_path: Path, fixture="known-answer", intent=None):
     )
 
 
-def trial(spec=SPEC, links=(), statuses=("successful",)):
+def trial(spec=SPEC, links=(), statuses=("successful",), *, results=("result",)):
     attempts = tuple(
         ExecutionAttempt(
-            uuid4(), uuid4(), None, TIME, TIME, Outcome(status, f"Supplied {status}", ("result",))
+            uuid4(), uuid4(), None, TIME, TIME, Outcome(status, f"Supplied {status}", results)
         )
         for status in statuses
     )
@@ -116,6 +128,29 @@ def linked_history():
             )
         )
     return tuple(trials), tuple(artifacts)
+
+
+@pytest.fixture
+def pilot_results():
+    second = replace(
+        PILOT,
+        reason="below_minimum",
+        trials=11,
+        confidence=0.99,
+        mean=Interval(0.30000000000000004, 1e30, -0.1, 0.4),
+        incremental=Interval(0.02, 0.003, -0.002, 0.05),
+        subperiods=(0.22, 0.23),
+        profile=Profile(0.02, 2, 0.1),
+    )
+    return tuple(
+        ArtifactInput(name, encode_evaluation(result), "application/json", EVALUATION_ROLE)
+        for name, result in (
+            ("pilot-a", PILOT),
+            ("pilot-b", second),
+            ("unbenchmarked", replace(PILOT, incremental=None)),
+            ("invalid", Invalid("zero_variance", "Constant\nreturns\x1b", PILOT.profile)),
+        )
+    )
 
 
 def sections(stdout: str) -> dict[str, list[str]]:
@@ -184,9 +219,21 @@ def test_known_answer_against_null_differs_in_exactly_the_changed_fields(tmp_pat
 
 @pytest.mark.parametrize("selected", [True, False])
 def test_output_is_byte_identical_across_runs_copies_and_paths(
-    tmp_path, cli, linked_history, selected
+    tmp_path, cli, linked_history, pilot_results, selected
 ):
     trials, artifacts = linked_history
+    amended = []
+    for supplied, names in zip(trials[:2], (("pilot-a", "invalid"), ("pilot-b",)), strict=True):
+        attempt = supplied.attempts[-1]
+        attempt = replace(
+            attempt,
+            outcome=replace(
+                attempt.outcome, result_artifacts=(*attempt.outcome.result_artifacts, *names)
+            ),
+        )
+        amended.append(replace(supplied, attempts=(*supplied.attempts[:-1], attempt)))
+    trials = (*amended, trials[-1])
+    artifacts = (*artifacts, *pilot_results)
     selection = trials[-1].trial_id if selected else None
     package = save_package(tmp_path / "packages", PackageRecord(selection, trials), artifacts)
     record, digest = package.record, package.digest
@@ -208,12 +255,32 @@ def test_output_is_byte_identical_across_runs_copies_and_paths(
             str(trials[0].trial_id),
             "--trial-b",
             str(trials[1].trial_id),
+            "--evaluation-a",
+            "pilot-a",
+            "--evaluation-b",
+            "pilot-b",
         ).stdout
         for first in (str(package.path), str(package.path), str(copy), relative)
     }
     comparison = compare_packages(
-        package, package, trial_a=trials[0].trial_id, trial_b=trials[1].trial_id
+        package,
+        package,
+        trial_a=trials[0].trial_id,
+        trial_b=trials[1].trial_id,
+        evaluation_a="pilot-a",
+        evaluation_b="pilot-b",
     )
+    assert comparison == compare_packages(
+        package,
+        package,
+        trial_a=trials[0].trial_id,
+        trial_b=trials[1].trial_id,
+        evaluation_a="pilot-a",
+    )
+    assert comparison.metrics[0] == Metric("pairs", Decimal(11), Decimal(22))
+    assert comparison.metrics[1] == Metric("pilot trial count", Decimal(7), Decimal(11))
+    assert Row("pilot artifact", "pilot-a", "pilot-b") in comparison.outcome
+    assert (comparison.relation, comparison.shared_trials) == ("linked", (trials[0].trial_id,))
     assert outputs == {render_comparison(comparison)}
     assert (comparison.a.trial_id, comparison.b.trial_id) == (
         trials[0].trial_id,
@@ -497,3 +564,241 @@ def test_diagnostic_outside_its_profile_is_refused_with_the_reason(tmp_path, cli
     assert (result.returncode, result.stdout) == (1, "")
     assert result.stderr.startswith("Comparison failed: Diagnostic 'result' in ")
     assert reason in result.stderr
+
+
+@pytest.mark.parametrize("profile", [VERSION, SPEC.evaluation_profile])
+def test_singleton_pilots_show_recorded_fields_and_exact_decimals(
+    tmp_path, cli, pilot_results, profile
+):
+    spec = replace(SPEC, evaluation_profile=profile)
+    artifacts = (*ARTIFACTS, *pilot_results)
+    a = save(tmp_path, trial(spec, results=("pilot-a",)), artifacts=artifacts)
+    b = save(tmp_path, trial(spec, results=("pilot-b",)), artifacts=artifacts)
+    comparison = compare_packages(a, b)
+    assert comparison.outcome[3:] == (
+        Row("pilot artifact", "pilot-a", "pilot-b"),
+        Row("pilot kind", "evaluation", "evaluation"),
+        Row("pilot procedure", "pilot-evaluation/v1", "pilot-evaluation/v1"),
+        Row("pilot minimum effect", "0.005", "0.02"),
+        Row("pilot subperiod count", "2", "2"),
+        Row("pilot alpha", "0.05", "0.1"),
+        Row("pilot verdict", "supported", "null"),
+        Row("pilot reason", "above_minimum", "below_minimum"),
+        Row("pilot incremental interval", "present", "present"),
+        Row("pilot subperiod estimates by recorded position", "(0.12, 0.13)", "(0.22, 0.23)"),
+    )
+    assert comparison.metrics == tuple(
+        Metric(name, Decimal(a), Decimal(b))
+        for name, a, b in (
+            ("pilot trial count", "7", "11"),
+            ("pilot confidence", "0.975", "0.99"),
+            ("pilot mean estimate", "0.1", "0.30000000000000004"),
+            ("pilot mean standard error", "1e-30", "1e30"),
+            ("pilot mean lower", "-0.2", "-0.1"),
+            ("pilot mean upper", "0.30000000000000004", "0.4"),
+            ("pilot incremental estimate", "0.01", "0.02"),
+            ("pilot incremental standard error", "0.002", "0.003"),
+            ("pilot incremental lower", "-0.003", "-0.002"),
+            ("pilot incremental upper", "0.04", "0.05"),
+        )
+    )
+    for metric in comparison.metrics:
+        assert Fraction(metric.difference) == Fraction(metric.b) - Fraction(metric.a)
+    assert comparison.metrics[2].difference == Decimal("0.20000000000000004")
+    result = cli(tmp_path, "compare", str(a.path), str(b.path))
+    assert result.stdout == render_comparison(comparison)
+    assert (
+        "pilot subperiod estimates by recorded position" in sections(result.stdout)["Outcome"][-3]
+    )
+    help_text = cli(tmp_path, "compare", "--help").stdout
+    assert "--evaluation-a NAME" in help_text and "--evaluation-b NAME" in help_text
+
+
+@pytest.mark.parametrize("side", ["a", "b"])
+def test_pilot_ambiguity_is_sorted_and_explicit_choice_ignores_malformed_siblings(
+    tmp_path, cli, pilot_results, side
+):
+    malformed = ArtifactInput("z-malformed", b"{}\n", "application/json", EVALUATION_ROLE)
+    artifacts = (*ARTIFACTS, *pilot_results, malformed)
+    ambiguous = trial(results=("z-malformed", "pilot-a", "invalid"))
+    other = save(tmp_path, trial(results=("pilot-b",)), artifacts=artifacts)
+    projections = []
+    for reverse in (False, True):
+        attempt = ambiguous.attempts[-1]
+        if reverse:
+            attempt = replace(
+                attempt,
+                outcome=replace(
+                    attempt.outcome, result_artifacts=("invalid", "pilot-a", "z-malformed")
+                ),
+            )
+        package = save(
+            tmp_path,
+            replace(ambiguous, attempts=(attempt,)),
+            artifacts=artifacts[::-1] if reverse else artifacts,
+        )
+        a, b = (package, other) if side == "a" else (other, package)
+        reason = (
+            f"Package {side.upper()} at {package.path} trial {ambiguous.trial_id} has multiple "
+            "pilot-evaluation result artifacts in its last attempt; "
+            f"choose --evaluation-{side} NAME from: 'invalid', 'pilot-a', 'z-malformed'"
+        )
+        with pytest.raises(CompareError) as error:
+            compare_packages(a, b)
+        assert str(error.value) == reason
+        refused = cli(tmp_path, "compare", str(a.path), str(b.path), success=False)
+        assert (refused.returncode, refused.stdout, refused.stderr) == (
+            1,
+            "",
+            f"Comparison failed: {reason}\n",
+        )
+        comparison = compare_packages(a, b, **{f"evaluation_{side}": "pilot-a"})
+        projections.append((comparison.outcome, comparison.metrics))
+        result = cli(
+            tmp_path, "compare", str(a.path), str(b.path), f"--evaluation-{side}", "pilot-a"
+        )
+        assert result.stdout == render_comparison(comparison)
+    assert projections[0] == projections[1]
+
+
+@pytest.mark.parametrize("side", ["a", "b"])
+def test_pilot_choices_must_belong_to_the_chosen_trials_last_attempt(
+    tmp_path, cli, pilot_results, side
+):
+    artifacts = (*ARTIFACTS, *pilot_results, replace(pilot_results[0], name="earlier"))
+    earlier = trial(results=("earlier",))
+    chosen = trial(results=("pilot-a", "result"))
+    chosen = replace(chosen, attempts=(*earlier.attempts, *chosen.attempts))
+    other_trial = trial(results=("pilot-b",))
+    package = save(tmp_path, chosen, other_trial, artifacts=artifacts)
+    other = save(tmp_path, trial(results=("pilot-b",)), artifacts=artifacts)
+    a, b = (package, other) if side == "a" else (other, package)
+    for name in ("missing", "result", "earlier", "pilot-b", ""):
+        reason = (
+            f"Package {side.upper()} at {package.path} trial {chosen.trial_id} has no eligible "
+            f"pilot-evaluation result artifact {name!r} in its last attempt; "
+            "eligible artifacts: 'pilot-a'"
+        )
+        with pytest.raises(CompareError) as error:
+            compare_packages(a, b, **{f"trial_{side}": chosen.trial_id, f"evaluation_{side}": name})
+        assert str(error.value) == reason
+        refused = cli(
+            tmp_path,
+            "compare",
+            str(a.path),
+            str(b.path),
+            f"--trial-{side}",
+            str(chosen.trial_id),
+            f"--evaluation-{side}",
+            name,
+            success=False,
+        )
+        assert (refused.returncode, refused.stdout, refused.stderr) == (
+            1,
+            "",
+            f"Comparison failed: {reason}\n",
+        )
+    planned = replace(chosen, attempts=())
+    empty = save(tmp_path, planned, artifacts=artifacts)
+    a, b = (empty, other) if side == "a" else (other, empty)
+    with pytest.raises(CompareError) as error:
+        compare_packages(a, b, **{f"evaluation_{side}": "pilot-a"})
+    assert str(error.value) == (
+        f"Package {side.upper()} at {empty.path} trial {planned.trial_id} has no eligible "
+        "pilot-evaluation result artifact 'pilot-a' in its last attempt; eligible artifacts: none"
+    )
+    refused = cli(
+        tmp_path,
+        "compare",
+        str(a.path),
+        str(b.path),
+        f"--evaluation-{side}",
+        "pilot-a",
+        success=False,
+    )
+    assert (refused.returncode, refused.stdout, refused.stderr) == (
+        1,
+        "",
+        f"Comparison failed: {error.value}\n",
+    )
+
+
+def test_pilot_absence_invalid_and_missing_incremental_keep_numbers_absent(
+    tmp_path, cli, pilot_results
+):
+    artifacts = (*ARTIFACTS, *pilot_results)
+    valid = save(tmp_path, trial(results=("pilot-a",)), artifacts=artifacts)
+    unbenchmarked = save(tmp_path, trial(results=("unbenchmarked",)), artifacts=artifacts)
+    invalid = save(tmp_path, trial(results=("invalid",)), artifacts=artifacts)
+    earlier = trial(results=("pilot-a",))
+    failed = trial(statuses=("failed",))
+    absent = save(
+        tmp_path,
+        replace(earlier, attempts=(*earlier.attempts, *failed.attempts)),
+        artifacts=artifacts,
+    )
+    comparison = compare_packages(valid, unbenchmarked)
+    assert Row("pilot incremental interval", "present", "absent") in comparison.outcome
+    assert all(metric.b is None and metric.difference is None for metric in comparison.metrics[-4:])
+    assert comparison.metrics[2] == Metric("pilot mean estimate", Decimal("0.1"), Decimal("0.1"))
+    for a, b in ((valid, invalid), (invalid, valid), (valid, absent), (absent, valid)):
+        comparison = compare_packages(a, b)
+        assert len(comparison.metrics) == 10
+        assert all(metric.difference is None for metric in comparison.metrics)
+        assert all((metric.a is None) != (metric.b is None) for metric in comparison.metrics)
+    invalid_only = compare_packages(invalid, invalid)
+    assert invalid_only.metrics == ()
+    assert invalid_only.outcome[3:] == (
+        Row("pilot artifact", "invalid", "invalid"),
+        Row("pilot kind", "invalid", "invalid"),
+        Row("pilot procedure", "pilot-evaluation/v1", "pilot-evaluation/v1"),
+        Row("pilot minimum effect", "0.005", "0.005"),
+        Row("pilot subperiod count", "2", "2"),
+        Row("pilot alpha", "0.05", "0.05"),
+        Row("pilot reason", "zero_variance", "zero_variance"),
+        Row("pilot invalid detail", "Constant\nreturns\x1b", "Constant\nreturns\x1b"),
+    )
+    stdout = cli(tmp_path, "compare", str(invalid.path), str(invalid.path)).stdout
+    assert "  same       pilot invalid detail: Constant returns\\x1b\n" in stdout
+    no_pilot = compare_packages(absent, absent)
+    assert not any(row.name.startswith("pilot ") for row in no_pilot.outcome)
+    assert no_pilot.metrics == ()
+    last_failed = save(
+        tmp_path, trial(statuses=("failed",), results=("pilot-a",)), artifacts=artifacts
+    )
+    assert compare_packages(valid, last_failed).metrics == compare_packages(valid, valid).metrics
+
+
+def test_selected_pilot_decode_and_post_open_integrity_errors_remain_package_errors(
+    tmp_path, cli, pilot_results
+):
+    malformed = ArtifactInput(
+        "malformed",
+        canonical_bytes({"kind": "evaluation", "result": {}, "schema_version": 1}),
+        "application/json",
+        EVALUATION_ROLE,
+    )
+    package = save(tmp_path, trial(results=("malformed",)), artifacts=(*ARTIFACTS, malformed))
+    with pytest.raises(PackageError, match="evaluation") as error:
+        compare_packages(package, package)
+    result = cli(tmp_path, "compare", str(package.path), str(package.path), success=False)
+    assert (result.returncode, result.stdout, result.stderr) == (
+        1,
+        "",
+        f"Package verification failed: {error.value}\n",
+    )
+    for changed in ("artifact", "manifest"):
+        package = save(
+            tmp_path / changed, trial(results=("pilot-a",)), artifacts=(*ARTIFACTS, *pilot_results)
+        )
+        path = package.path / "manifest.json"
+        if changed == "artifact":
+            artifact = next(item for item in package.artifact_records if item.name == "pilot-a")
+            path = package.path / "artifacts" / artifact.digest
+        path.write_bytes(path.read_bytes() + b"\n")
+        with pytest.raises(PackageError):
+            compare_packages(package, package)
+        result = cli(tmp_path, "compare", str(package.path), str(package.path), success=False)
+        assert (result.returncode, result.stdout) == (1, "")
+        assert result.stderr.startswith("Package verification failed: ")
+        assert "Traceback" not in result.stderr

@@ -131,7 +131,11 @@ quant-research compare PACKAGE_A PACKAGE_B \
   --trial-a TRIAL_A_UUID --trial-b TRIAL_B_UUID
 ```
 
-Python callers pass the same choices as keyword-only `trial_a` and `trial_b` UUIDs to `compare_packages`. An omitted selector still refuses a package that selects no trial. An explicit UUID absent from its own package refuses with the side and UUID named. Comparison preserves package selection, bytes, digest, and history. Outcome and metrics use each compared trial's last supplied attempt. Only `descriptive-pearson/v1` currently supplies metrics. [D082](decisions.md#d082-compare-explicitly-chosen-trials-without-changing-package-selection) amends the original [D034 comparison rules](decisions.md#d034-compare-the-selected-trials-of-two-verified-packages).
+Python callers pass the same choices as keyword-only `trial_a` and `trial_b` UUIDs to `compare_packages`. An omitted trial selector refuses a package that selects no trial. An explicit UUID absent from its own package refuses with the side and UUID named. Comparison preserves package selection, bytes, digest, and history. Outcome and metrics use each compared trial's last supplied attempt. [D082](decisions.md#d082-compare-explicitly-chosen-trials-without-changing-package-selection) amends the original [D034 comparison rules](decisions.md#d034-compare-the-selected-trials-of-two-verified-packages).
+
+Comparison reads replay diagnostics and recorded pilot evaluations. `--evaluation-a NAME` and `--evaluation-b NAME` independently choose pilot artifacts from each compared trial's last attempt. Python callers pass `evaluation_a` and `evaluation_b` strings. An omitted artifact selector uses the sole eligible pilot result, leaves absent evidence absent, and refuses several results with sorted candidate names. An explicit name outside that side's eligible results refuses without fallback. [D083](decisions.md#d083-compare-recorded-pilot-evaluations-with-independent-artifact-choices) records eligibility and error rules.
+
+Pilot outcome rows show the recorded profile, verdict or invalid reason, and subperiod estimates by recorded position. Numeric metrics include the recorded trial count, confidence, and available interval components. Differences are exact B minus A on recorded decimal spellings. They establish no shared baseline, aligned periods, ranking, or significance. Comparison does not recompute evaluations.
 
 ## Replay the synthetic development fixture
 

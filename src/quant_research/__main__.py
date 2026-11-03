@@ -64,6 +64,13 @@ def main() -> None:
         metavar="UUID",
         help="Trial in package B to compare; defaults to its selected trial",
     )
+    for side in ("a", "b"):
+        compare.add_argument(
+            f"--evaluation-{side}",
+            metavar="NAME",
+            help=f"Pilot artifact in {side.upper()}'s compared trial's last attempt; "
+            "defaults to its sole eligible result",
+        )
     replay = commands.add_parser("replay", help="Run the fixed synthetic development fixture")
     replay.add_argument("path", type=Path)
     replay.add_argument("--output", type=Path, required=True)
@@ -360,6 +367,8 @@ def main() -> None:
                 open_package(args.b),
                 trial_a=args.trial_a,
                 trial_b=args.trial_b,
+                evaluation_a=args.evaluation_a,
+                evaluation_b=args.evaluation_b,
             )
         except PackageError as error:
             parser.exit(1, f"Package verification failed: {error}\n")
