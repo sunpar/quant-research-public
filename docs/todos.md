@@ -54,6 +54,7 @@ This list tracks capabilities and dependencies for the current revision. Return 
 ## Research package report
 
 - [x] Render a deterministic Markdown report from a verified package with `quant-research report`.
+- [x] Read a named artifact's exact bytes through `quant-research artifact`, including packages without a selected trial, per [D086](decisions.md#d086-read-named-package-artifacts-through-the-cli).
 
 ## Real integration after the local batch
 
