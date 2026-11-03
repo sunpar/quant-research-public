@@ -6,7 +6,9 @@ from decimal import MAX_EMAX, MAX_PREC, MIN_EMIN, Context, Decimal
 from typing import Literal
 from uuid import UUID
 
+from quant_research.evaluation import Invalid
 from quant_research.packages import PackageRecord, TrialRecord, VerifiedPackage
+from quant_research.reference import EVALUATION_ROLE, decode_evaluation
 from quant_research.replay import EVALUATION_PROFILE
 from quant_research.report import single_line
 
@@ -31,7 +33,7 @@ _METRICS = {
 
 
 class CompareError(ValueError):
-    """Report an unavailable trial, or a result artifact outside its profile."""
+    """Report an unavailable selection, or a diagnostic outside its profile."""
 
 
 def _mark(a: object, b: object) -> Mark:
@@ -199,6 +201,69 @@ def _number(source: str, field: str, value: object) -> Decimal:
     return number
 
 
+def _pilot_evaluation(
+    package: VerifiedPackage, trial: TrialRecord, requested: str | None, side: str
+) -> tuple[dict[str, str], dict[str, Decimal]]:
+    names = set(trial.attempts[-1].outcome.result_artifacts) if trial.attempts else set()
+    eligible = sorted(
+        item.name
+        for item in package.artifact_records
+        if item.role == EVALUATION_ROLE and item.name in names
+    )
+    choices = ", ".join(map(repr, eligible)) or "none"
+    source = f"Package {side} at {package.path} trial {trial.trial_id}"
+    if requested is not None:
+        if requested not in eligible:
+            raise CompareError(
+                f"{source} has no eligible pilot-evaluation result artifact {requested!r} "
+                f"in its last attempt; eligible artifacts: {choices}"
+            )
+        name = requested
+    elif not eligible:
+        return {}, {}
+    elif len(eligible) > 1:
+        raise CompareError(
+            f"{source} has multiple pilot-evaluation result artifacts in its last attempt; "
+            f"choose --evaluation-{side.lower()} NAME from: {choices}"
+        )
+    else:
+        name = eligible[0]
+    result = decode_evaluation(package.read_artifact(name))
+    outcome = {
+        "pilot artifact": name,
+        "pilot kind": "invalid" if isinstance(result, Invalid) else "evaluation",
+        "pilot procedure": result.profile.version,
+        "pilot minimum effect": repr(result.profile.minimum_effect),
+        "pilot subperiod count": str(result.profile.subperiods),
+        "pilot alpha": repr(result.profile.alpha),
+    }
+    if isinstance(result, Invalid):
+        return outcome | {"pilot reason": result.reason, "pilot invalid detail": result.detail}, {}
+    outcome.update(
+        {
+            "pilot verdict": result.verdict,
+            "pilot reason": result.reason,
+            "pilot incremental interval": "absent" if result.incremental is None else "present",
+            "pilot subperiod estimates by recorded position": repr(result.subperiods),
+        }
+    )
+    metrics = {
+        "pilot trial count": Decimal(result.trials),
+        "pilot confidence": Decimal(repr(result.confidence)),
+    }
+    for label, interval in (("mean", result.mean), ("incremental", result.incremental)):
+        if interval is not None:
+            metrics.update(
+                {
+                    f"pilot {label} estimate": Decimal(repr(interval.estimate)),
+                    f"pilot {label} standard error": Decimal(repr(interval.standard_error)),
+                    f"pilot {label} lower": Decimal(repr(interval.lower)),
+                    f"pilot {label} upper": Decimal(repr(interval.upper)),
+                }
+            )
+    return outcome, metrics
+
+
 def _ancestors(record: PackageRecord, root: UUID) -> set[UUID]:
     found = {root}
     # Verified links name only earlier trials, so one reverse pass is transitive.
@@ -218,6 +283,8 @@ def compare_packages(
     *,
     trial_a: UUID | None = None,
     trial_b: UUID | None = None,
+    evaluation_a: str | None = None,
+    evaluation_b: str | None = None,
 ) -> Comparison:
     """Compare one supplied trial from each verified development package.
 
@@ -226,18 +293,25 @@ def compare_packages(
         b (VerifiedPackage): Package shown as side B, opened with `open_package`.
         trial_a (UUID, optional): Trial in A to compare, or its recorded selection.
         trial_b (UUID, optional): Trial in B to compare, or its recorded selection.
+        evaluation_a (str, optional): Pilot artifact in A's trial's last attempt, or its sole one.
+        evaluation_b (str, optional): Pilot artifact in B's trial's last attempt, or its sole one.
 
     Returns:
         (Comparison) Paired specification, input, version, outcome, and metric rows, with the
             lineage relation between the two compared trials.
 
     Raises:
-        CompareError: If a requested trial is absent, an omitted side selects no trial, or a
-            diagnostic does not follow its declared evaluation profile.
+        CompareError: If a requested trial or pilot artifact is absent, an omitted side selects
+            no trial, pilot artifacts are ambiguous, or a diagnostic is outside its profile.
+        PackageError: If a selected pilot artifact fails verified reading or typed decoding.
     """
     compared_a = _trial(a, trial_a, "A")
     compared_b = _trial(b, trial_b, "B")
+    pilot_outcome_a, pilot_metrics_a = _pilot_evaluation(a, compared_a, evaluation_a, "A")
+    pilot_outcome_b, pilot_metrics_b = _pilot_evaluation(b, compared_b, evaluation_b, "B")
     rows_a, rows_b = _rows(compared_a), _rows(compared_b)
+    rows_a["outcome"].update(pilot_outcome_a)
+    rows_b["outcome"].update(pilot_outcome_b)
     shared = _ancestors(a.record, compared_a.trial_id) & _ancestors(b.record, compared_b.trial_id)
     same_lineage = compared_a.lineage_id == compared_b.lineage_id
     relation = "same lineage" if same_lineage else "linked" if shared else "unrelated"
@@ -245,7 +319,11 @@ def compare_packages(
         _identity(a, compared_a),
         _identity(b, compared_b),
         **{section: _pair(Row, values, rows_b[section]) for section, values in rows_a.items()},
-        metrics=_pair(Metric, _metrics(a, compared_a), _metrics(b, compared_b)),
+        metrics=_pair(
+            Metric,
+            _metrics(a, compared_a) | pilot_metrics_a,
+            _metrics(b, compared_b) | pilot_metrics_b,
+        ),
         relation=relation,
         shared_trials=tuple(sorted(shared, key=str)),
     )
