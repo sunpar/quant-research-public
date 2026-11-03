@@ -195,6 +195,21 @@ make run ARGS='data approve alfred.unrate --root DATA_ROOT --actor NAME'
 
 Pull and ingest default to `alfred.unrate`, `alfred.sahmrealtime`, and `french.ff3_monthly`. Pull prints each download's digest, retrieval time, and URL. Ingest prints each dataset's name, row count, vintage, and catalog status, which stays `documented` until validation and approval. The root holds `objects/` for original bytes by SHA-256, `pulls/` for pull records, `datasets/` for the adapter's vintage files, and `catalog.json`. Agent reads pass the root's `datasets/` directory and catalog to the dataset adapter. [D052](decisions.md#d052-ingest-the-pilots-public-data-into-a-vintage-addressed-store) records the conventions and limits.
 
+## Inspect recorded dataset status
+
+Inspect recorded catalog state without downloading or changing data:
+
+```sh
+make run ARGS='data status --root DATA_ROOT'
+make run ARGS='data status --root DATA_ROOT --query "unrate" --status approved'
+```
+
+`data status` reads only `catalog.json` and prints a JSON array ordered by dataset name. Each object has exactly `dataset`, `status`, `adapter`, `gaps`, and `documentation`. The status is `documented`, `validated`, `approved`, or `revoked`. The adapter is the recorded adapter only while approved, otherwise `null`. Gaps retain their recorded order, followed by missing publication, revision, and arrival evidence gaps. Documentation preserves every field of the latest documentation event, including nested vintage evidence, access labels, provider declarations, and its UTC governance timestamp.
+
+`--query` matches every whitespace-separated term, ignoring case, across the dataset name, latest owner, and fields. It does not search gaps or evidence text. `--status` filters by one of the four recorded statuses, and both filters apply together. An absent root, an absent catalog, an empty catalog, and no matches all print `[]` without creating state. A present malformed or noncanonical catalog, or a read failure, exits 1 with `Data status failed: ...` on stderr and no JSON output. An invalid status or missing `--root` exits 2.
+
+This local operator view reports recorded governance facts. Approval does not establish campaign eligibility, current provider permission, adapter compatibility, readable files, freshness, completeness, or row availability. Provider declarations remain visible after revocation. Status does not inspect dataset or object files, obtain the current time, or contact a provider. [D085](decisions.md#d085-inspect-recorded-data-status-without-changing-the-catalog) records this boundary.
+
 ## Register the paper case
 
 The paper case's series are `alfred.<series>` datasets, so the same commands pull and ingest them by name:
