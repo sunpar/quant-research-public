@@ -14,6 +14,7 @@ from uuid import uuid4
 
 import pytest
 
+from quant_research.__main__ import main
 from quant_research.packages import (
     ArtifactInput,
     EnvironmentRecord,
@@ -149,6 +150,62 @@ def test_selected_trial_of_a_package_without_one_raises_a_named_error(tmp_path, 
     saved = save_package(tmp_path, replace(record, trial_id=None), artifacts)
     with pytest.raises(PackageError, match="The package selects no trial"):
         _ = open_package(saved.path).record.selected_trial
+
+
+@pytest.mark.parametrize("supplied", [True, False], ids=["trials", "no-trials"])
+@pytest.mark.parametrize("payload", [b"\x00\xff\r\nend", b""], ids=["binary", "empty"])
+def test_artifact_cli_recovers_exact_bytes_from_an_unselected_copy(
+    tmp_path, evidence, cli, supplied, payload
+):
+    record, artifacts = evidence
+    record = replace(record, trial_id=None, trials=record.trials if supplied else ())
+    artifacts += (ArtifactInput("payload", payload, "application/octet-stream", "result"),)
+    origin = tmp_path / "origin"
+    saved = save_package(origin, record, artifacts)
+    copied = tmp_path / "unrelated directory" / "renamed package"
+    shutil.copytree(saved.path, copied)
+    shutil.rmtree(origin)
+    result = cli(tmp_path, "artifact", str(copied), "payload", text=False)
+    assert result.returncode == 0
+    assert result.stdout == payload
+    assert result.stderr == b""
+
+
+def test_artifact_cli_refuses_an_unknown_logical_name(tmp_path, evidence, cli):
+    saved = save_package(tmp_path, *evidence)
+    result = cli(
+        tmp_path, "artifact", str(saved.path), "../manifest.json", text=False, success=False
+    )
+    assert result.returncode == 1
+    assert result.stdout == b""
+    assert result.stderr == b"Cannot read artifact: Unknown artifact '../manifest.json'\n"
+
+
+def test_artifact_cli_verifies_unrelated_artifacts_before_output(tmp_path, evidence, cli):
+    saved = save_package(tmp_path, *evidence)
+    unrelated = next(item for item in saved.artifact_records if item.name == "failure")
+    (saved.path / "artifacts" / unrelated.digest).write_bytes(b"changed bytes")
+    result = cli(tmp_path, "artifact", str(saved.path), "result", text=False, success=False)
+    assert result.returncode == 1
+    assert result.stdout == b""
+    assert result.stderr.startswith(b"Package verification failed: ")
+    assert b"Artifact 'failure' hash or size does not match" in result.stderr
+    assert b"Traceback" not in result.stderr
+
+
+def test_artifact_cli_reports_a_retained_read_failure(monkeypatch, capsysbinary):
+    class UnreadablePackage:
+        def read_artifact(self, name):
+            raise PackageError("Controlled retained-read failure")
+
+    monkeypatch.setattr("quant_research.__main__.open_package", lambda path: UnreadablePackage())
+    monkeypatch.setattr(sys, "argv", ["quant-research", "artifact", "package", "result"])
+    with pytest.raises(SystemExit) as stopped:
+        main()
+    captured = capsysbinary.readouterr()
+    assert stopped.value.code == 1
+    assert captured.out == b""
+    assert captured.err == b"Cannot read artifact: Controlled retained-read failure\n"
 
 
 @pytest.mark.parametrize("status", ["successful", "rejected", "failed", "null", "inconclusive"])

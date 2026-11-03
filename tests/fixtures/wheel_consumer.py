@@ -23,9 +23,16 @@ artifacts = saved.artifacts()
 assert artifacts
 for artifact in artifacts:
     assert saved.read_artifact(artifact.name) == artifact.data
+artifacts += (
+    packages.ArtifactInput("binary", b"\x00\xff\r\nend", "application/octet-stream", "result"),
+)
 copied = packages.save_package(Path("copies"), saved.record, artifacts)
 assert packages.save_package(Path("copies"), copied.record, artifacts).digest == copied.digest
 assert packages.open_package(copied.path).record == saved.record
+sys.argv = ["quant-research", "artifact", str(copied.path), "binary"]
+with io.TextIOWrapper(io.BytesIO()) as stdout, contextlib.redirect_stdout(stdout):
+    main()
+    assert stdout.buffer.getvalue() == b"\x00\xff\r\nend"
 print("Wheel import and portable save/open consumer passed")
 
 sessions = {"s0": "2026-01-05T16:00:00Z", "s1": "2026-01-06T16:00:00Z"}

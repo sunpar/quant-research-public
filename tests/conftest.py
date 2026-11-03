@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.fixture
 def cli():
-    def run(directory: Path, *arguments: str, success=True):
+    def run(directory: Path, *arguments: str, success=True, text=True):
         bootstrap = (
             f"import runpy, sys; sys.path.append({str(ROOT / 'src')!r}); "
             f"sys.argv = {['quant_research', *arguments]!r}; "
@@ -33,7 +33,7 @@ def cli():
         result = subprocess.run(
             [sys.executable, "-B", "-I", "-S", "-c", bootstrap],
             cwd=directory,
-            text=True,
+            text=text,
             capture_output=True,
         )
         assert (result.returncode == 0) == success, result.stdout + result.stderr

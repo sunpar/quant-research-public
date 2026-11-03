@@ -50,6 +50,9 @@ def main() -> None:
     for name in ("inspect", "verify"):
         command = commands.add_parser(name)
         command.add_argument("path", type=Path)
+    artifact = commands.add_parser("artifact", help="Write a named artifact to standard output")
+    artifact.add_argument("path", type=Path, metavar="PACKAGE")
+    artifact.add_argument("name", metavar="NAME", help="Logical artifact name from inspect")
     compare = commands.add_parser("compare", help="Compare two verified packages")
     compare.add_argument("a", type=Path, metavar="package-a")
     compare.add_argument("b", type=Path, metavar="package-b")
@@ -403,6 +406,13 @@ def main() -> None:
         package = open_package(args.path)
     except PackageError as error:
         parser.exit(1, f"Package verification failed: {error}\n")
+    if args.command == "artifact":
+        try:
+            content = package.read_artifact(args.name)
+        except PackageError as error:
+            parser.exit(1, f"Cannot read artifact: {error}\n")
+        sys.stdout.buffer.write(content)
+        return
     if args.command == "report":
         try:
             report = render_report(package)
