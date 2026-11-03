@@ -837,6 +837,37 @@ def test_registration_freezes_only_available_rows_from_a_pinned_future_vintage(
     assert prospective.load_log(root).report()[0].observations == (observation,)
 
 
+def test_prospective_cli_reports_ids_without_changing_registration(tmp_path, terminal_package, cli):
+    from quant_research.prospective import load_log
+
+    make, _ = terminal_package
+    package = make("full")
+    root = tmp_path / "log"
+    arguments = ("prospective", "register", str(package.path), "--root", str(root))
+    registered = json.loads(cli(tmp_path, *arguments).stdout)
+    registration = load_log(root).events[0]
+    assert registered["registration_id"] == registration.registration_id
+    assert registered["procedure_id"] == registration.procedure.identity
+    stored = {path.name: path.read_bytes() for path in (root / "events").glob("*.json")}
+    report = json.loads(cli(tmp_path, "prospective", "report", "--root", str(root)).stdout)
+    assert report == [
+        {
+            "registration_id": registered["registration_id"],
+            "procedure_id": registered["procedure_id"],
+            "registration": {
+                key: value
+                for key, value in registered.items()
+                if key not in ("registration_id", "procedure_id")
+            },
+            "observations": [],
+        }
+    ]
+    assert json.loads(cli(tmp_path, *arguments).stdout) == registered
+    assert json.loads(cli(tmp_path, "prospective", "report", "--root", str(root)).stdout) == report
+    assert {path.name: path.read_bytes() for path in (root / "events").glob("*.json")} == stored
+    assert len(load_log(root).events) == 1
+
+
 def test_top_level_observe_cli_records_and_refuses_evidence_without_append(tmp_path, cli):
     from dataclasses import asdict
 
@@ -844,14 +875,15 @@ def test_top_level_observe_cli_records_and_refuses_evidence_without_append(tmp_p
 
     root = tmp_path / "log"
     root.mkdir()
-    registration, history = stored_registration(root)
+    _, history = stored_registration(root)
+    reported = json.loads(cli(tmp_path, "prospective", "report", "--root", str(root)).stdout)[0]
     new = row("2026-11-01", datetime(2026, 12, 2, tzinfo=UTC))
     scored = read_evidence(new, scored=((new.key, 1),))
     for index, read in enumerate((history, scored)):
         (tmp_path / f"read-{index}.json").write_bytes(read.record.to_bytes())
         (tmp_path / f"vintage-{index}.json").write_bytes(read.vintage)
     evidence = {
-        "procedure": registration.procedure.identity,
+        "procedure": reported["procedure_id"],
         "window": {
             "dataset_id": "monthly",
             "start": "2026-11-01T00:00:00Z",
@@ -872,7 +904,7 @@ def test_top_level_observe_cli_records_and_refuses_evidence_without_append(tmp_p
     )
     arguments = (
         "observe",
-        registration.registration_id,
+        reported["registration_id"],
         "--root",
         str(root),
         "--evidence",
@@ -884,6 +916,7 @@ def test_top_level_observe_cli_records_and_refuses_evidence_without_append(tmp_p
     )
     result = cli(tmp_path, *arguments)
     assert json.loads(result.stdout)["outcome"]["status"] == "null"
+    assert json.loads(result.stdout)["procedure"] == reported["procedure_id"]
     assert len(load_log(root).events) == 2
     for value in (reference("wrong procedure"), None):
         if value is None:
@@ -896,5 +929,6 @@ def test_top_level_observe_cli_records_and_refuses_evidence_without_append(tmp_p
         assert "Traceback" not in refusal.stderr
         assert len(load_log(root).events) == 2
     report = cli(tmp_path, "prospective", "report", "--root", str(root))
-    assert json.loads(report.stdout)[0]["registration_id"] == registration.registration_id
+    assert json.loads(report.stdout)[0]["registration_id"] == reported["registration_id"]
+    assert json.loads(report.stdout)[0]["procedure_id"] == reported["procedure_id"]
     assert json_default(REGISTERED) == "2026-11-02T09:00:00Z"
