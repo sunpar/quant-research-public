@@ -54,6 +54,8 @@ This list tracks capabilities and dependencies for the current revision. Return 
 ## Research package report
 
 - [x] Render a deterministic Markdown report from a verified package with `quant-research report`.
+- [x] Convert canonical reports into offline HTML with contents, literal search, and two optional appendix folds, per [D087](decisions.md#d087-convert-canonical-reports-into-offline-html).
+- [x] Complete the independent packaged-wheel, offline-browser, and full-print checks recorded in D087.
 - [x] Read a named artifact's exact bytes through `quant-research artifact`, including packages without a selected trial, per [D086](decisions.md#d086-read-named-package-artifacts-through-the-cli).
 
 ## Real integration after the local batch

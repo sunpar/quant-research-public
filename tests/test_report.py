@@ -401,27 +401,52 @@ def test_report_of_a_package_without_trials_says_none_were_supplied(tmp_path):
     }
 
 
+@pytest.mark.parametrize("format", [None, "markdown", "html"])
 def test_report_bytes_match_across_renders_copies_stdout_and_output_file(
-    tmp_path, cli, monkeypatch
+    tmp_path, cli, monkeypatch, format
 ):
+    from quant_research.report_html import render_html
+
     package = build(tmp_path / "saved")
-    text = render_report(package)
+    render = (
+        (lambda package: render_html(render_report(package))) if format == "html" else render_report
+    )
+    arguments = [] if format is None else ["--format", format]
+    text = render(package)
     assert text.endswith("\n") and not text.endswith("\n\n")
-    assert render_report(package) == text
+    assert render(package) == text
     copied = tmp_path / "elsewhere" / "renamed copy"
     shutil.copytree(package.path, copied)
-    assert render_report(open_package(copied)) == text
-    assert cli(tmp_path, "report", str(copied)).stdout == text
+    assert render(open_package(copied)) == text
+    assert (
+        cli(tmp_path, "report", str(copied), *arguments, dependencies=format == "html").stdout
+        == text
+    )
     output = tmp_path / "report.md"
-    assert cli(tmp_path, "report", str(copied), "--output", str(output)).stdout == ""
+    assert (
+        cli(
+            tmp_path,
+            "report",
+            str(copied),
+            *arguments,
+            "--output",
+            str(output),
+            dependencies=format == "html",
+        ).stdout
+        == ""
+    )
     assert output.read_bytes() == text.encode()
     monkeypatch.setenv("LC_ALL", "en_US.ISO8859-1")
-    assert cli(tmp_path, "report", str(copied)).stdout == text
+    assert (
+        cli(tmp_path, "report", str(copied), *arguments, dependencies=format == "html").stdout
+        == text
+    )
 
 
 @pytest.mark.smoke
 @pytest.mark.parametrize("damage", ["artifact-byte", "rewritten-manifest"])
-def test_damaged_package_fails_report_without_creating_output(tmp_path, cli, damage):
+@pytest.mark.parametrize("format", ["markdown", "html"])
+def test_damaged_package_fails_report_without_creating_output(tmp_path, cli, damage, format):
     package = build(tmp_path / "saved")
     copied = tmp_path / "damaged"
     shutil.copytree(package.path, copied)
@@ -442,7 +467,17 @@ def test_damaged_package_fails_report_without_creating_output(tmp_path, cli, dam
     with pytest.raises(PackageError):
         open_package(copied)
     output = tmp_path / "report.md"
-    result = cli(tmp_path, "report", str(copied), "--output", str(output), success=False)
+    result = cli(
+        tmp_path,
+        "report",
+        str(copied),
+        "--format",
+        format,
+        "--output",
+        str(output),
+        success=False,
+        dependencies=format == "html",
+    )
     assert result.returncode == 1
     assert "Package verification failed" in result.stderr
     assert result.stdout == ""
@@ -486,16 +521,44 @@ def test_each_pilot_evaluation_an_attempt_produced_renders_after_its_limitations
     assert text.count("- Evaluation procedure: ") == len(results)
 
 
-def test_a_malformed_or_changed_pilot_evaluation_fails_the_report_before_any_output(tmp_path, cli):
+@pytest.mark.parametrize("format", ["markdown", "html"])
+@pytest.mark.parametrize("existing", [False, True])
+def test_a_malformed_or_changed_pilot_evaluation_fails_the_report_before_any_output(
+    tmp_path, cli, format, existing
+):
     malformed = evaluated(tmp_path / "malformed", {"evaluation": b"{}\n"})
     with pytest.raises(PackageError):
         render_report(malformed)
     output = tmp_path / "report.md"
-    result = cli(tmp_path, "report", str(malformed.path), "--output", str(output), success=False)
+    if existing:
+        output.write_bytes(b"Previous report\n")
+    result = cli(
+        tmp_path,
+        "report",
+        str(malformed.path),
+        "--format",
+        format,
+        "--output",
+        str(output),
+        success=False,
+        dependencies=format == "html",
+    )
     assert result.returncode == 1
     assert result.stdout == ""
     assert "Traceback" not in result.stderr
-    assert not output.exists()
+    assert output.read_bytes() == b"Previous report\n" if existing else not output.exists()
+    assert (
+        cli(
+            tmp_path,
+            "report",
+            str(malformed.path),
+            "--format",
+            format,
+            success=False,
+            dependencies=format == "html",
+        ).stdout
+        == ""
+    )
     data = encode_evaluation(SUPPORTED)
     changed = evaluated(tmp_path / "changed", {"evaluation": data})
     stored = changed.path / "artifacts" / hashlib.sha256(data).hexdigest()
