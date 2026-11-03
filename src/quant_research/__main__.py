@@ -20,7 +20,7 @@ from quant_research.accounting import Charged, Ledger, Released, Reserved, load_
 from quant_research.accounting import json_default as ledger_json
 from quant_research.backtest import BacktestError
 from quant_research.campaigns import CampaignRevision, parse_file
-from quant_research.catalog import CatalogError
+from quant_research.catalog import CatalogError, Status
 from quant_research.compare import CompareError, compare_packages, render_comparison
 from quant_research.confirmation import Period
 from quant_research.datasets import DatasetError, ReadRecord, Refused
@@ -115,8 +115,14 @@ def main() -> None:
         "series", help="Compare the recomputed real-time Sahm series with FRED's"
     )
     series.add_argument("--root", type=Path, required=True)
-    data = commands.add_parser("data", help="Pull, ingest, validate, and approve public data")
+    data = commands.add_parser(
+        "data", help="Inspect, pull, ingest, validate, and approve public data"
+    )
     steps = data.add_subparsers(dest="step", required=True)
+    data_status = steps.add_parser("status", help="Print recorded catalog status and documentation")
+    data_status.add_argument("--root", type=Path, required=True)
+    data_status.add_argument("--query", default="")
+    data_status.add_argument("--status", choices=get_args(Status.__value__))
     for name, help_text in (
         ("pull", "Download each dataset and keep its original bytes"),
         ("ingest", "Store each latest pull as a vintage and document it in the catalog"),
@@ -221,32 +227,48 @@ def main() -> None:
     if args.command == "campaign":
         return _campaign(parser, args)
     if args.command == "data":
-        now = datetime.now(UTC).replace(microsecond=0)
         try:
-            if args.step == "pull":
-                key = os.environ.get("FRED_API_KEY")
+            if args.step == "status":
                 results = [
-                    asdict(public_data.pull(args.root, name, now=now, api_key=key))
-                    for name in args.datasets
+                    {
+                        "dataset": entry.name,
+                        "status": entry.status,
+                        "adapter": entry.adapter,
+                        "gaps": entry.gaps,
+                        "documentation": asdict(entry.documentation),
+                    }
+                    for entry in public_data.load_catalog(args.root).search(
+                        args.query, status=args.status
+                    )
                 ]
-            elif args.step == "ingest":
-                results = [
-                    asdict(public_data.ingest(args.root, name, now=now, approved_for=args.provider))
-                    for name in args.datasets
-                ]
-            elif args.step == "validate":
-                status = public_data.validate(
-                    args.root,
-                    args.dataset,
-                    actor=args.actor,
-                    evidence=args.evidence.read_bytes(),
-                    summary=args.summary,
-                    now=now,
-                )
-                results = [{"dataset": args.dataset, "status": status}]
             else:
-                status = public_data.approve(args.root, args.dataset, actor=args.actor, now=now)
-                results = [{"dataset": args.dataset, "status": status}]
+                now = datetime.now(UTC).replace(microsecond=0)
+                if args.step == "pull":
+                    key = os.environ.get("FRED_API_KEY")
+                    results = [
+                        asdict(public_data.pull(args.root, name, now=now, api_key=key))
+                        for name in args.datasets
+                    ]
+                elif args.step == "ingest":
+                    results = [
+                        asdict(
+                            public_data.ingest(args.root, name, now=now, approved_for=args.provider)
+                        )
+                        for name in args.datasets
+                    ]
+                elif args.step == "validate":
+                    status = public_data.validate(
+                        args.root,
+                        args.dataset,
+                        actor=args.actor,
+                        evidence=args.evidence.read_bytes(),
+                        summary=args.summary,
+                        now=now,
+                    )
+                    results = [{"dataset": args.dataset, "status": status}]
+                elif args.step == "approve":
+                    status = public_data.approve(args.root, args.dataset, actor=args.actor, now=now)
+                    results = [{"dataset": args.dataset, "status": status}]
         except (public_data.PublicDataError, CatalogError, DatasetError, OSError) as error:
             parser.exit(1, f"Data {args.step} failed: {error}\n")
         print(json.dumps(results, default=json_default, indent=2, sort_keys=True))
