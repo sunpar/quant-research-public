@@ -21,6 +21,7 @@ from quant_research.packages import (
     PackageRecord,
     Specification,
     TrialRecord,
+    open_package,
     save_package,
 )
 from quant_research.replay import EVALUATION_PROFILE, NewTrial, Repeat, replay_fixture
@@ -80,6 +81,41 @@ def trial(spec=SPEC, links=(), statuses=("successful",)):
 def save(tmp_path: Path, *trials: TrialRecord, artifacts=ARTIFACTS):
     record = PackageRecord(trials[-1].trial_id, trials)
     return save_package(tmp_path / "packages", record, artifacts)
+
+
+@pytest.fixture
+def linked_history():
+    trials, artifacts = [], list(ARTIFACTS)
+    for name, pairs, inputs in (
+        ("ancestor", 11, (DIGESTS["first"],)),
+        ("middle", 22, (DIGESTS["second"],)),
+        ("latest", 33, (DIGESTS["first"], DIGESTS["second"])),
+    ):
+        links = ()
+        if trials:
+            parent = trials[-1]
+            links = (LineageLink(parent.trial_id, parent.specification.spec_id, "follows", name),)
+        supplied = trial(
+            replace(
+                SPEC,
+                question=f"{name} question",
+                evaluation_profile=EVALUATION_PROFILE,
+                implementation_version=f"{name}/v1",
+                input_digests=inputs,
+            ),
+            links,
+            statuses=("failed", "successful") if not trials else ("successful",),
+        )
+        last = replace(
+            supplied.attempts[-1], outcome=Outcome("successful", f"{name} outcome", (name,))
+        )
+        trials.append(replace(supplied, attempts=(*supplied.attempts[:-1], last)))
+        artifacts.append(
+            ArtifactInput(
+                name, f'{{"pairs": {pairs}}}\n'.encode(), "application/json", "diagnostic"
+            )
+        )
+    return tuple(trials), tuple(artifacts)
 
 
 def sections(stdout: str) -> dict[str, list[str]]:
@@ -146,19 +182,131 @@ def test_known_answer_against_null_differs_in_exactly_the_changed_fields(tmp_pat
     assert sections(stdout)["Lineage"] == ["  relation: unrelated", "  shared trials: none"]
 
 
-def test_output_is_byte_identical_across_runs_copies_and_paths(tmp_path, cli):
-    a, b = replay(tmp_path, "known-answer"), replay(tmp_path, "null")
-    copy = tmp_path / "elsewhere" / "renamed"
-    shutil.copytree(a.path, copy)
-    relative = str(a.path.relative_to(tmp_path))
-    outputs = {
-        cli(tmp_path, "compare", first, str(b.path)).stdout
-        for first in (str(a.path), str(a.path), str(copy), relative)
+@pytest.mark.parametrize("selected", [True, False])
+def test_output_is_byte_identical_across_runs_copies_and_paths(
+    tmp_path, cli, linked_history, selected
+):
+    trials, artifacts = linked_history
+    selection = trials[-1].trial_id if selected else None
+    package = save_package(tmp_path / "packages", PackageRecord(selection, trials), artifacts)
+    record, digest = package.record, package.digest
+    before = {
+        path.relative_to(package.path): path.read_bytes()
+        for path in package.path.rglob("*")
+        if path.is_file()
     }
-    assert outputs == {render_comparison(compare_packages(a, b))}
+    copy = tmp_path / "elsewhere" / "renamed"
+    shutil.copytree(package.path, copy)
+    relative = str(package.path.relative_to(tmp_path))
+    outputs = {
+        cli(
+            tmp_path,
+            "compare",
+            first,
+            str(package.path),
+            "--trial-a",
+            str(trials[0].trial_id),
+            "--trial-b",
+            str(trials[1].trial_id),
+        ).stdout
+        for first in (str(package.path), str(package.path), str(copy), relative)
+    }
+    comparison = compare_packages(
+        package, package, trial_a=trials[0].trial_id, trial_b=trials[1].trial_id
+    )
+    assert outputs == {render_comparison(comparison)}
+    assert (comparison.a.trial_id, comparison.b.trial_id) == (
+        trials[0].trial_id,
+        trials[1].trial_id,
+    )
     (stdout,) = outputs
     assert str(tmp_path) not in stdout
     assert relative not in stdout
+    assert (package.record, package.digest) == (record, digest)
+    for path in (package.path, copy):
+        reopened = open_package(path)
+        assert (reopened.record, reopened.digest) == (record, digest)
+        assert reopened.record.trial_id == selection
+        assert {
+            file.relative_to(path): file.read_bytes() for file in path.rglob("*") if file.is_file()
+        } == before
+
+
+def test_explicit_trials_control_identity_rows_metrics_and_ancestry(tmp_path, cli, linked_history):
+    trials, artifacts = linked_history
+    package = save(tmp_path, *trials, artifacts=artifacts)
+    ancestor, middle, _ = trials
+    comparison = compare_packages(
+        package, package, trial_a=ancestor.trial_id, trial_b=middle.trial_id
+    )
+    assert comparison.a.package == comparison.b.package == package.digest
+    assert (comparison.a.trial_id, comparison.a.lineage_id, comparison.a.spec_id) == (
+        ancestor.trial_id,
+        ancestor.lineage_id,
+        ancestor.specification.spec_id,
+    )
+    assert (comparison.b.trial_id, comparison.b.lineage_id, comparison.b.spec_id) == (
+        middle.trial_id,
+        middle.lineage_id,
+        middle.specification.spec_id,
+    )
+    assert comparison.specification[0] == Row("question", "ancestor question", "middle question")
+    assert comparison.inputs[-1] == Row("input 1", DIGESTS["first"], DIGESTS["second"])
+    assert comparison.versions[0] == Row("implementation version", "ancestor/v1", "middle/v1")
+    assert comparison.outcome == (
+        Row("attempts", "2", "1"),
+        Row("status", "successful", "successful"),
+        Row("detail", "ancestor outcome", "middle outcome"),
+    )
+    assert comparison.metrics == (Metric("pairs", Decimal(11), Decimal(22)),)
+    assert (comparison.relation, comparison.shared_trials) == ("linked", (ancestor.trial_id,))
+    result = cli(
+        tmp_path,
+        "compare",
+        str(package.path),
+        str(package.path),
+        "--trial-a",
+        str(ancestor.trial_id),
+        "--trial-b",
+        str(middle.trial_id),
+    )
+    assert result.stdout == render_comparison(comparison)
+
+
+def test_explicit_middle_trial_keeps_all_of_its_ancestors(tmp_path, linked_history):
+    trials, artifacts = linked_history
+    package = save(tmp_path, *trials, artifacts=artifacts)
+    ancestor, middle, latest = trials
+    comparison = compare_packages(
+        package, package, trial_a=middle.trial_id, trial_b=latest.trial_id
+    )
+    assert (comparison.relation, comparison.shared_trials) == (
+        "linked",
+        tuple(sorted((ancestor.trial_id, middle.trial_id), key=str)),
+    )
+
+
+@pytest.mark.parametrize("side", ["a", "b"])
+def test_one_explicit_trial_keeps_the_other_sides_selection(tmp_path, cli, linked_history, side):
+    trials, artifacts = linked_history
+    package = save(tmp_path, *trials, artifacts=artifacts)
+    comparison = compare_packages(package, package, **{f"trial_{side}": trials[0].trial_id})
+    expected = (trials[0].trial_id, trials[2].trial_id)
+    values = (Decimal(11), Decimal(33))
+    if side == "b":
+        expected, values = expected[::-1], values[::-1]
+    assert (comparison.a.trial_id, comparison.b.trial_id) == expected
+    assert comparison.metrics == (Metric("pairs", *values),)
+    assert comparison.shared_trials == (trials[0].trial_id,)
+    result = cli(
+        tmp_path,
+        "compare",
+        str(package.path),
+        str(package.path),
+        f"--trial-{side}",
+        str(trials[0].trial_id),
+    )
+    assert result.stdout == render_comparison(comparison)
 
 
 @pytest.mark.parametrize("corrupt", [0, 1])
@@ -241,12 +389,85 @@ def test_a_package_without_a_selected_trial_is_refused_naming_its_side(tmp_path,
         tmp_path / "unselected", replace(selected.record, trial_id=None), ARTIFACTS
     )
     a, b = (unselected, selected) if side == "A" else (selected, unselected)
-    with pytest.raises(CompareError, match=f"^Package {side} at .* selects no trial"):
+    reason = (
+        f"Package {side} at {unselected.path} selects no trial; "
+        "compare needs a selected trial in each package"
+    )
+    with pytest.raises(CompareError) as error:
         compare_packages(a, b)
+    assert str(error.value) == reason
+    with pytest.raises(CompareError) as error:
+        compare_packages(a, b, **{f"trial_{'b' if side == 'A' else 'a'}": selected.record.trial_id})
+    assert str(error.value) == reason
     result = cli(tmp_path, "compare", str(a.path), str(b.path), success=False)
     assert (result.returncode, result.stdout) == (1, "")
-    assert result.stderr.startswith(f"Comparison failed: Package {side} at {unselected.path} ")
-    assert "selects no trial" in result.stderr
+    assert result.stderr == f"Comparison failed: {reason}\n"
+
+
+@pytest.mark.parametrize("side", ["a", "b"])
+def test_explicit_uuid_must_belong_to_its_own_side(tmp_path, cli, linked_history, side):
+    trials, artifacts = linked_history
+    history = save(tmp_path, *trials, artifacts=artifacts)
+    other = save(tmp_path, trial())
+    a, b = (other, history) if side == "a" else (history, other)
+    requested = trials[0].trial_id
+    reason = f"Package {side.upper()} at {other.path} has no trial {requested}"
+    with pytest.raises(CompareError) as error:
+        compare_packages(a, b, **{f"trial_{side}": requested})
+    assert str(error.value) == reason
+    result = cli(
+        tmp_path,
+        "compare",
+        str(a.path),
+        str(b.path),
+        f"--trial-{side}",
+        str(requested),
+        success=False,
+    )
+    assert (result.returncode, result.stdout, result.stderr) == (
+        1,
+        "",
+        f"Comparison failed: {reason}\n",
+    )
+
+
+def test_empty_history_refuses_selection_and_resolves_side_a_first(tmp_path, cli):
+    package = save_package(tmp_path / "packages", PackageRecord(None, ()), ())
+    with pytest.raises(CompareError) as error:
+        compare_packages(package, package)
+    assert str(error.value) == (
+        f"Package A at {package.path} selects no trial; "
+        "compare needs a selected trial in each package"
+    )
+    requested = uuid4()
+    reason = f"Package A at {package.path} has no trial {requested}"
+    with pytest.raises(CompareError) as error:
+        compare_packages(package, package, trial_a=requested, trial_b=uuid4())
+    assert str(error.value) == reason
+    result = cli(
+        tmp_path,
+        "compare",
+        str(package.path),
+        str(package.path),
+        "--trial-a",
+        str(requested),
+        success=False,
+    )
+    assert (result.returncode, result.stdout, result.stderr) == (
+        1,
+        "",
+        f"Comparison failed: {reason}\n",
+    )
+
+
+@pytest.mark.parametrize("option", ["--trial-a", "--trial-b"])
+def test_malformed_trial_uuid_is_rejected_before_opening_packages(tmp_path, cli, option):
+    result = cli(tmp_path, "compare", "missing-a", "missing-b", option, "not-a-uuid", success=False)
+    assert (result.returncode, result.stdout) == (2, "")
+    assert option in result.stderr
+    assert "invalid UUID value" in result.stderr
+    assert "not-a-uuid" in result.stderr
+    assert "Package verification failed" not in result.stderr
 
 
 def test_metric_difference_is_exact_beyond_default_decimal_precision():

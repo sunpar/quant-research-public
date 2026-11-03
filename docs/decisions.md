@@ -451,7 +451,7 @@ The move changes no encoding. `canonical_bytes` keeps the `json.dumps` options, 
 
 ## D034. Compare the selected trials of two verified packages
 
-Selected on 22 October 2026 for the experiment comparisons in [Phase 2 of the master plan](master-plan.md#phase-2-deliver-a-durable-research-workspace). [quant_research.compare](../src/quant_research/compare.py) compares the selected trials of two packages. `compare_packages` accepts only `VerifiedPackage` values, so a caller must open both packages first. `render_comparison` turns the result into deterministic text, and `quant-research compare A B` prints that text. The command exits 1 with the verifier's reason when either package fails verification, and it prints nothing else. Different packages still exit 0. A package that selects no trial is refused with its side named, per [D060](#d060-let-a-package-record-no-selected-trial).
+Selected on 22 October 2026 for the experiment comparisons in [Phase 2 of the master plan](master-plan.md#phase-2-deliver-a-durable-research-workspace). [quant_research.compare](../src/quant_research/compare.py) compares the selected trials of two packages. `compare_packages` accepts only `VerifiedPackage` values, so a caller must open both packages first. `render_comparison` turns the result into deterministic text, and `quant-research compare A B` prints that text. The command exits 1 with the verifier's reason when either package fails verification, and it prints nothing else. Different packages still exit 0. A package that selects no trial is refused with its side named, per [D060](#d060-let-a-package-record-no-selected-trial). [D082](#d082-compare-explicitly-chosen-trials-without-changing-package-selection) later adds explicit selectors that override these defaults for comparison.
 
 The comparison holds rows for the specification, the inputs, the versions, and the outcome, plus metrics and the lineage relation. The row sections split the selected trial's specification fields, so no field appears twice. Each side's package digest, trial, lineage, and specification ID are a header. They are not rows, because two different packages always differ in them. A row is marked same, different, only in A, or only in B. `differences` lists every row and metric that is not the same, so a package compared with itself has none.
 
@@ -465,7 +465,7 @@ The text contains no filesystem paths, so copies of the same packages give ident
 
 These limits are deliberate:
 
-- Only the selected trials are compared. Other supplied trials, other attempts, and exposure events appear only through the attempt count and the lineage relation.
+- One trial per side is compared. [D082](#d082-compare-explicitly-chosen-trials-without-changing-package-selection) permits a supplied UUID to override that side's recorded selection. Other supplied trials, other attempts, and exposure events appear only through the attempt count and the lineage relation.
 - The comparison reports differences and does not rank outcomes or judge significance.
 - Artifact bytes are compared only through their digests.
 - Metric strings are parsed by `Decimal`, which accepts more spellings than the replay contract writes. A metric with an extreme exponent, such as `1E+999999999999`, can exhaust memory when its difference is computed exactly. Replay never writes such values.
@@ -1342,7 +1342,7 @@ A package that selects no trial has `trial_id` `None`, and it may supply no tria
 | `verify` | Verifies it |
 | `inspect` | Prints `lineage_id` and the record's `trial_id` as null |
 | `report` | States "The package selects no trial." in the introduction and in place of the question, and lists every supplied trial. With no trials, the trials section says "No trials were supplied. This does not establish that no trial ran." |
-| `compare` | Exits 1 with `Comparison failed: Package A at <path> selects no trial; compare needs a selected trial in each package`, naming side A or B |
+| `compare` | Without an explicit selector for that side, exits 1 with `Comparison failed: Package A at <path> selects no trial; compare needs a selected trial in each package`, naming side A or B. [D082](#d082-compare-explicitly-chosen-trials-without-changing-package-selection) permits an explicit supplied trial. |
 | `reconcile package` | Exits 1 with `Reconciliation failed: The package selects no trial` |
 | `replay --repeat` and `--retry` | Exit 1 with `Replay failed: The package selects no trial` and save nothing |
 | `replay --new --history` | Carries the package's trials, exposures, and artifacts into the new package and links the new trial to none of them. When no history package selects a trial, the new trial starts a new lineage. |
@@ -2258,3 +2258,13 @@ The context owns its archive codec. New mapped archives retain the actual full-c
 Verification preserves a prechange nonempty tool read of an interval-excluded observation, its description, authority, contexts, source generations, campaign and read bytes. They reproduce exactly after new mapping publication. The actual retained P20 first export also reproduces its original prospective procedure and read-evidence bytes. New checks cover disjoint unions, revisions and delayed arrivals, endpoint semantics, changed-authority replay refusal, narrowing, warmup, factor refusal, archived parent and child contexts, empty reads and missing or mismatched archive evidence. Preserved evidence is under `~/.codex/artifacts/quant-permitted-intervals-20261024`, with manifest SHA-256 `2b4eb565b8f1438403e512c32c7c2a15678ff0e0615ea8eb58664079acb57088`. The selection-certification probes, preserved failures and final source bindings are under the same artifact directory's `selection-fix` subdirectory, with manifest SHA-256 `8ac8748c465ad1b9a5598f62784dbb1d2a6a4cd7b003d378ba38bffa7ac40de8`. The PR records completed checks and the exact-commit merge gate.
 
 This implements local read-time authority for the six declared monthly contracts. Opaque-key and other calendar mappings still need their own supported contract. Real future observations, human review, firm interfaces and Phase 4 acceptance remain open.
+
+## D082. Compare explicitly chosen trials without changing package selection
+
+Selected on 2 November 2026 under the user's autonomy grant. This amends [D034](#d034-compare-the-selected-trials-of-two-verified-packages) and the comparison refusal in [D060](#d060-let-a-package-record-no-selected-trial). A researcher can compare supplied trials from a campaign that selected none, or compare two trials from one package. [Architecture](architecture.md#compare-supplied-trials) owns the command and API options.
+
+Each side independently uses its explicit UUID or defaults to its package's recorded selection. An omitted selector retains the exact existing no-selection refusal. An explicit UUID must belong to that side's supplied history. An absent UUID refuses with the side and UUID named, without falling back to a recorded selection or the other package's trials. Side A resolves before side B. The CLI parses UUID syntax before opening packages and exits 2 for malformed UUIDs. Membership refusals exit 1 and print no comparison.
+
+Comparison resolves each side once to its existing `TrialRecord` and passes it through identity, specification, inputs, versions, outcome, metrics, and ancestry. The original package record, selection, digest, bytes, and full supplied history remain unchanged. Ancestry starts at the compared trial and follows its supplied links, excluding later descendants. Outcome and metrics still use the last supplied attempt. Metric extraction remains limited to `descriptive-pearson/v1`; `pilot-evaluation/v1` still supplies no metrics.
+
+Offline API and CLI tests cover distinct trial diagnostics, multi-hop ancestry, independent mixed selectors, unselected packages, missing IDs on both sides, malformed UUIDs, empty history, and identical output across repeated, relative, copied, and renamed paths. Reopened records and every package file retain their original values and bytes after comparison. These fixture checks establish no scientific, researcher, real-framework, or Phase 4 acceptance.

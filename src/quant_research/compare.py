@@ -31,7 +31,7 @@ _METRICS = {
 
 
 class CompareError(ValueError):
-    """Report a package that selects no trial, or a result artifact outside its profile."""
+    """Report an unavailable trial, or a result artifact outside its profile."""
 
 
 def _mark(a: object, b: object) -> Mark:
@@ -81,7 +81,7 @@ class Metric:
 
 @dataclass(frozen=True)
 class Comparison:
-    """Pair the selected trials of two verified packages field by field."""
+    """Pair the compared trials of two verified packages field by field."""
 
     a: Identity
     b: Identity
@@ -108,8 +108,21 @@ def _sections(comparison: Comparison) -> tuple[tuple[str, tuple[Row | Metric, ..
     )
 
 
-def _identity(package: VerifiedPackage) -> Identity:
-    trial = package.record.selected_trial
+def _trial(package: VerifiedPackage, requested: UUID | None, side: str) -> TrialRecord:
+    if requested is None:
+        if package.record.trial_id is None:
+            raise CompareError(
+                f"Package {side} at {package.path} selects no trial; "
+                "compare needs a selected trial in each package"
+            )
+        return package.record.selected_trial
+    for trial in package.record.trials:
+        if trial.trial_id == requested:
+            return trial
+    raise CompareError(f"Package {side} at {package.path} has no trial {requested}")
+
+
+def _identity(package: VerifiedPackage, trial: TrialRecord) -> Identity:
     return Identity(package.digest, trial.trial_id, trial.lineage_id, trial.specification.spec_id)
 
 
@@ -153,8 +166,7 @@ def _outcome(trial: TrialRecord) -> dict[str, str]:
     }
 
 
-def _metrics(package: VerifiedPackage) -> dict[str, Decimal]:
-    trial = package.record.selected_trial
+def _metrics(package: VerifiedPackage, trial: TrialRecord) -> dict[str, Decimal]:
     table = _METRICS.get(trial.specification.evaluation_profile)
     if table is None or not trial.attempts:
         return {}
@@ -187,8 +199,8 @@ def _number(source: str, field: str, value: object) -> Decimal:
     return number
 
 
-def _ancestors(record: PackageRecord) -> set[UUID]:
-    found = {record.trial_id}
+def _ancestors(record: PackageRecord, root: UUID) -> set[UUID]:
+    found = {root}
     # Verified links name only earlier trials, so one reverse pass is transitive.
     for trial in reversed(record.trials):
         if trial.trial_id in found:
@@ -200,36 +212,40 @@ def _pair(kind: type[Row | Metric], a: dict, b: dict) -> tuple:
     return tuple(kind(name, a.get(name), b.get(name)) for name in a | b)
 
 
-def compare_packages(a: VerifiedPackage, b: VerifiedPackage) -> Comparison:
-    """Compare the selected trials of two verified development packages.
+def compare_packages(
+    a: VerifiedPackage,
+    b: VerifiedPackage,
+    *,
+    trial_a: UUID | None = None,
+    trial_b: UUID | None = None,
+) -> Comparison:
+    """Compare one supplied trial from each verified development package.
 
     Args:
         a (VerifiedPackage): Package shown as side A, opened with `open_package`.
         b (VerifiedPackage): Package shown as side B, opened with `open_package`.
+        trial_a (UUID, optional): Trial in A to compare, or its recorded selection.
+        trial_b (UUID, optional): Trial in B to compare, or its recorded selection.
 
     Returns:
         (Comparison) Paired specification, input, version, outcome, and metric rows, with the
-            lineage relation between the two selected trials.
+            lineage relation between the two compared trials.
 
     Raises:
-        CompareError: If either package selects no trial, or a diagnostic does not follow its
-            declared evaluation profile.
+        CompareError: If a requested trial is absent, an omitted side selects no trial, or a
+            diagnostic does not follow its declared evaluation profile.
     """
-    for side, package in (("A", a), ("B", b)):
-        if package.record.trial_id is None:
-            raise CompareError(
-                f"Package {side} at {package.path} selects no trial; "
-                "compare needs a selected trial in each package"
-            )
-    rows_a, rows_b = _rows(a.record.selected_trial), _rows(b.record.selected_trial)
-    shared = _ancestors(a.record) & _ancestors(b.record)
-    same_lineage = a.record.selected_trial.lineage_id == b.record.selected_trial.lineage_id
+    compared_a = _trial(a, trial_a, "A")
+    compared_b = _trial(b, trial_b, "B")
+    rows_a, rows_b = _rows(compared_a), _rows(compared_b)
+    shared = _ancestors(a.record, compared_a.trial_id) & _ancestors(b.record, compared_b.trial_id)
+    same_lineage = compared_a.lineage_id == compared_b.lineage_id
     relation = "same lineage" if same_lineage else "linked" if shared else "unrelated"
     return Comparison(
-        _identity(a),
-        _identity(b),
+        _identity(a, compared_a),
+        _identity(b, compared_b),
         **{section: _pair(Row, values, rows_b[section]) for section, values in rows_a.items()},
-        metrics=_pair(Metric, _metrics(a), _metrics(b)),
+        metrics=_pair(Metric, _metrics(a, compared_a), _metrics(b, compared_b)),
         relation=relation,
         shared_trials=tuple(sorted(shared, key=str)),
     )
@@ -260,7 +276,7 @@ def render_comparison(comparison: Comparison) -> str:
     """
     lines = [
         "Comparison of two verified development packages",
-        "Outcome and metrics use the last supplied attempt of each selected trial. "
+        "Outcome and metrics use the last supplied attempt of each compared trial. "
         "Metric differences are B minus A.",
         "",
     ]
