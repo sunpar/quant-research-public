@@ -52,6 +52,18 @@ def main() -> None:
     compare = commands.add_parser("compare", help="Compare two verified packages")
     compare.add_argument("a", type=Path, metavar="package-a")
     compare.add_argument("b", type=Path, metavar="package-b")
+    compare.add_argument(
+        "--trial-a",
+        type=UUID,
+        metavar="UUID",
+        help="Trial in package A to compare; defaults to its selected trial",
+    )
+    compare.add_argument(
+        "--trial-b",
+        type=UUID,
+        metavar="UUID",
+        help="Trial in package B to compare; defaults to its selected trial",
+    )
     replay = commands.add_parser("replay", help="Run the fixed synthetic development fixture")
     replay.add_argument("path", type=Path)
     replay.add_argument("--output", type=Path, required=True)
@@ -343,7 +355,12 @@ def main() -> None:
         return
     if args.command == "compare":
         try:
-            comparison = compare_packages(open_package(args.a), open_package(args.b))
+            comparison = compare_packages(
+                open_package(args.a),
+                open_package(args.b),
+                trial_a=args.trial_a,
+                trial_b=args.trial_b,
+            )
         except PackageError as error:
             parser.exit(1, f"Package verification failed: {error}\n")
         except CompareError as error:

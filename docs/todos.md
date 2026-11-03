@@ -44,7 +44,7 @@ This list tracks capabilities and dependencies for the current revision. Return 
 
 ## Experiment comparison
 
-- [x] Compare the selected trials of two verified packages with `quant-research compare`, per [D034](decisions.md#d034-compare-the-selected-trials-of-two-verified-packages).
+- [x] Compare selected or explicitly chosen trials of verified packages with `quant-research compare`, per [D082](decisions.md#d082-compare-explicitly-chosen-trials-without-changing-package-selection).
 
 ## Follow-ups from causal replay
 
