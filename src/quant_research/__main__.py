@@ -133,6 +133,9 @@ def main() -> None:
     data_status.add_argument("--root", type=Path, required=True)
     data_status.add_argument("--query", default="")
     data_status.add_argument("--status", choices=get_args(Status.__value__))
+    data_history = steps.add_parser("history", help="Print every recorded event for one dataset")
+    data_history.add_argument("dataset", metavar="DATASET")
+    data_history.add_argument("--root", type=Path, required=True)
     for name, help_text in (
         ("pull", "Download each dataset and keep its original bytes"),
         ("ingest", "Store each latest pull as a vintage and document it in the catalog"),
@@ -250,6 +253,11 @@ def main() -> None:
                     for entry in public_data.load_catalog(args.root).search(
                         args.query, status=args.status
                     )
+                ]
+            elif args.step == "history":
+                results = [
+                    {"kind": event.kind, **asdict(event)}
+                    for event in public_data.load_catalog(args.root).entry(args.dataset).history
                 ]
             else:
                 now = datetime.now(UTC).replace(microsecond=0)

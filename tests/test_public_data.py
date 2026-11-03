@@ -553,11 +553,11 @@ def root_state(root):
     return {
         str(path.relative_to(root)): (
             path.read_bytes() if path.is_file() else None,
-            path.stat().st_mtime_ns,
-            path.stat().st_ino,
+            path.lstat().st_mtime_ns,
+            path.lstat().st_ino,
         )
         for path in (root, *root.rglob("*"))
-        if path.exists()
+        if path.exists() or path.is_symlink()
     }
 
 
@@ -617,9 +617,12 @@ def status_root(tmp_path):
 
 def test_cli_data_status_projects_recorded_state_and_latest_documentation(status_root, cli):
     before = root_state(status_root)
-    result = cli(status_root, "data", "status", "--root", str(status_root))
+    result = cli(status_root, "data", "status", "--root", str(status_root), text=False)
+    assert hashlib.sha256(result.stdout).hexdigest() == (
+        "5d0022e48553b71d9e5555f6bc4d0d3908961f587e9880ed5767fa1f6e388c74"
+    )
     rows = json.loads(result.stdout)
-    assert result.stderr == ""
+    assert result.stderr == b""
     assert all(
         set(row) == {"dataset", "status", "adapter", "gaps", "documentation"} for row in rows
     )
@@ -671,9 +674,178 @@ def test_cli_data_status_projects_recorded_state_and_latest_documentation(status
         {"aspect": "arrival", "evidence": {"digest": "3" * 64, "summary": "Receipt archive"}},
     ]
     assert rows[3]["documentation"]["approved_for"] == ["retained-route"]
-    assert cli(status_root, "data", "status", "--root", str(status_root)).stdout == result.stdout
+    assert (
+        cli(status_root, "data", "status", "--root", str(status_root), text=False).stdout
+        == result.stdout
+    )
     assert root_state(status_root) == before
     assert set(path.name for path in status_root.iterdir()) == {"catalog.json"}
+
+
+def test_cli_data_history_keeps_complete_interleaved_equal_time_events(status_root, cli):
+    events = list(load_catalog(status_root).events)
+    events.insert(1, events.pop(4))
+    assert [event.dataset for event in events[:5]] == [
+        "d.revoked",
+        "c.validated",
+        "d.revoked",
+        "d.revoked",
+        "d.revoked",
+    ]
+    (status_root / "catalog.json").write_bytes(Catalog(tuple(events)).to_bytes())
+    expected = [
+        {
+            "kind": "documented",
+            "dataset": "d.revoked",
+            "actor": "catalog editor",
+            "at": "2026-10-23T12:00:00Z",
+            "owner": "Markets",
+            "fields": ["return"],
+            "access": ["internal", "public"],
+            "vintage": "a" * 64,
+            "known_gaps": ["Incomplete historical coverage"],
+            "vintages": [
+                {
+                    "aspect": "publication",
+                    "evidence": {"digest": "1" * 64, "summary": "Publisher archive"},
+                },
+                {
+                    "aspect": "revision",
+                    "evidence": {"digest": "2" * 64, "summary": "Revision archive"},
+                },
+                {
+                    "aspect": "arrival",
+                    "evidence": {"digest": "3" * 64, "summary": "Receipt archive"},
+                },
+            ],
+            "approved_for": ["retained-route"],
+        },
+        {
+            "kind": "validated",
+            "dataset": "d.revoked",
+            "actor": "reviewer",
+            "at": "2026-10-23T12:00:00Z",
+            "evidence": {"digest": "4" * 64, "summary": "Manual attestation"},
+        },
+        {
+            "kind": "approved",
+            "dataset": "d.revoked",
+            "actor": "lead",
+            "at": "2026-10-23T12:00:00Z",
+            "adapter": "old.adapter",
+        },
+        {
+            "kind": "revoked",
+            "dataset": "d.revoked",
+            "actor": "lead",
+            "at": "2026-10-23T12:00:00Z",
+            "reason": "Withdrawn",
+        },
+    ]
+    assert set(path.name for path in status_root.iterdir()) == {"catalog.json"}
+    before = root_state(status_root)
+    for _ in range(2):
+        result = cli(
+            status_root, "data", "history", "d.revoked", "--root", str(status_root), text=False
+        )
+        assert result.stdout == (json.dumps(expected, indent=2, sort_keys=True) + "\n").encode()
+        assert result.stderr == b""
+        assert root_state(status_root) == before
+
+
+def test_cli_data_history_keeps_prior_and_current_documentation(status_root, cli):
+    before = root_state(status_root)
+    expected = [
+        {
+            "kind": "documented",
+            "dataset": "a.documented",
+            "actor": "writer",
+            "at": "2026-10-22T12:00:00Z",
+            "owner": "Former owner",
+            "fields": ["old_field"],
+            "access": ["public"],
+            "vintage": "0" * 64,
+            "known_gaps": [],
+            "vintages": [],
+            "approved_for": [],
+        },
+        {
+            "kind": "documented",
+            "dataset": "a.documented",
+            "actor": "catalog editor",
+            "at": "2026-10-23T12:00:00Z",
+            "owner": "Research Ops",
+            "fields": ["Signal Value", "release_month"],
+            "access": ["internal", "public"],
+            "vintage": "a" * 64,
+            "known_gaps": ["Unresolved splice", "Gap-only-token"],
+            "vintages": [
+                {
+                    "aspect": "revision",
+                    "evidence": {"digest": "2" * 64, "summary": "Evidence-only-token"},
+                },
+            ],
+            "approved_for": ["claude-subscription", "codex-subscription"],
+        },
+    ]
+    result = cli(status_root, "data", "history", "a.documented", "--root", str(status_root))
+    assert result.stdout == json.dumps(expected, indent=2, sort_keys=True) + "\n"
+    assert result.stderr == ""
+    assert root_state(status_root) == before
+
+
+@pytest.mark.parametrize("dataset", ["unknown", "D.REVOKED", " d.revoked", "d.revoked ", ""])
+def test_cli_data_history_requires_an_exact_dataset_name(status_root, cli, dataset):
+    before = root_state(status_root)
+    for _ in range(2):
+        result = cli(
+            status_root, "data", "history", dataset, "--root", str(status_root), success=False
+        )
+        assert result.returncode == 1
+        assert result.stdout == ""
+        assert result.stderr == f"Data history failed: Unknown dataset {dataset!r}\n"
+        assert root_state(status_root) == before
+
+
+@pytest.mark.parametrize("kind", ["missing-root", "empty-root", "empty-catalog", "dangling-link"])
+def test_cli_data_history_missing_state_is_unknown_without_writes(tmp_path, cli, kind):
+    root = tmp_path / "data"
+    if kind != "missing-root":
+        root.mkdir()
+    if kind == "empty-catalog":
+        (root / "catalog.json").write_bytes(Catalog().to_bytes())
+    elif kind == "dangling-link":
+        (root / "catalog.json").symlink_to("absent.json")
+    before = root_state(tmp_path)
+    for _ in range(2):
+        result = cli(tmp_path, "data", "history", "d.revoked", "--root", str(root), success=False)
+        assert result.returncode == 1
+        assert result.stdout == ""
+        assert result.stderr == "Data history failed: Unknown dataset 'd.revoked'\n"
+        assert root_state(tmp_path) == before
+
+
+@pytest.mark.parametrize(
+    "arguments, missing",
+    [((), "DATASET, --root"), (("d.revoked",), "--root"), (("--root", "."), "DATASET")],
+)
+def test_cli_data_history_requires_dataset_and_root(tmp_path, cli, arguments, missing):
+    before = root_state(tmp_path)
+    result = cli(tmp_path, "data", "history", *arguments, success=False)
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert f"the following arguments are required: {missing}" in result.stderr
+    assert root_state(tmp_path) == before
+
+
+def test_cli_data_history_rejects_status_filters_without_writes(tmp_path, cli):
+    before = root_state(tmp_path)
+    result = cli(
+        tmp_path, "data", "history", "unknown", "--root", ".", "--query", "x", success=False
+    )
+    assert (result.returncode, result.stdout) == (2, "")
+    assert "unrecognized arguments: --query x" in result.stderr
+    assert root_state(tmp_path) == before
 
 
 @pytest.mark.parametrize(
@@ -709,23 +881,43 @@ def test_cli_data_status_returns_empty_without_creating_state(tmp_path, cli, kin
     assert root_state(root) == before
 
 
-@pytest.mark.parametrize("kind", ["malformed", "noncanonical", "directory"])
-def test_cli_data_status_preserves_named_catalog_failures(tmp_path, cli, kind):
-    path = tmp_path / "catalog.json"
+@pytest.mark.parametrize("step", ["status", "history"])
+@pytest.mark.parametrize(
+    "kind", ["malformed", "noncanonical", "unsupported", "transition", "directory"]
+)
+def test_cli_data_reads_preserve_named_catalog_failures(status_root, cli, kind, step):
+    path = status_root / "catalog.json"
     if kind == "directory":
+        path.unlink()
         path.mkdir()
+    elif kind in ("unsupported", "transition"):
+        value = json.loads(path.read_bytes())
+        if kind == "unsupported":
+            value["schema_version"] = 2
+        else:
+            value["events"].append(value["events"][-3])
+        path.write_text(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n")
     else:
         path.write_bytes(b"{" if kind == "malformed" else b'{ "schema_version": 1, "events": [] }')
-    before = root_state(tmp_path)
-    result = cli(
-        tmp_path, "data", "status", "--root", str(tmp_path), "--query", "no-match", success=False
-    )
-    assert result.returncode == 1
-    assert result.stdout == ""
-    assert result.stderr.startswith("Data status failed: ")
-    if kind == "noncanonical":
-        assert "not canonical UTF-8 JSON" in result.stderr
-    assert root_state(tmp_path) == before
+    with pytest.raises((CatalogError, OSError)) as failure:
+        load_catalog(status_root)
+    before = root_state(status_root)
+    for dataset in ("a.documented", "unknown"):
+        selection = ("--query", dataset) if step == "status" else (dataset,)
+        result = cli(
+            status_root, "data", step, "--root", str(status_root), *selection, success=False
+        )
+        assert result.returncode == 1
+        assert result.stdout == ""
+        assert result.stderr == f"Data {step} failed: {failure.value}\n"
+        assert "Unknown dataset" not in result.stderr
+        if kind == "noncanonical":
+            assert "not canonical UTF-8 JSON" in result.stderr
+        elif kind == "unsupported":
+            assert "Unsupported schema version 2" in result.stderr
+        elif kind == "transition":
+            assert "Cannot record approved for 'b.approved' while approved" in result.stderr
+        assert root_state(status_root) == before
 
 
 @pytest.mark.parametrize("arguments", [("--status", "ready"), ()])
@@ -737,36 +929,62 @@ def test_cli_data_status_rejects_invalid_arguments(tmp_path, cli, arguments):
     assert "invalid choice" in result.stderr if arguments else "--root" in result.stderr
 
 
-def test_data_status_main_needs_no_key_or_network(status_root, monkeypatch, capsys):
-    from quant_research.__main__ import main
+@pytest.mark.parametrize("step", ["status", "history"])
+def test_data_reads_need_no_key_clock_or_network(status_root, monkeypatch, capsys, step):
+    from quant_research import __main__ as command
 
     attempted = []
 
     def denied(*args, **kwargs):
         attempted.append((args, kwargs))
-        raise AssertionError("Status attempted network access")
+        raise AssertionError("Catalog read attempted network access")
+
+    class NoClock(datetime):
+        @classmethod
+        def now(cls, *args, **kwargs):
+            raise AssertionError("Catalog read requested current time")
 
     monkeypatch.delenv("FRED_API_KEY", raising=False)
+    monkeypatch.setattr(command, "datetime", NoClock)
     monkeypatch.setattr(urllib.request, "urlopen", denied)
     monkeypatch.setattr(socket, "create_connection", denied)
     monkeypatch.setattr(socket, "getaddrinfo", denied)
     monkeypatch.setattr(socket.socket, "connect", denied)
-    with pytest.raises(AssertionError, match="Status attempted network access"):
+    with pytest.raises(AssertionError, match="requested current time"):
+        command.datetime.now(UTC)
+    with pytest.raises(AssertionError, match="attempted network access"):
         urllib.request.urlopen("https://example.invalid")
+    with pytest.raises(AssertionError, match="attempted network access"):
+        socket.create_connection(("example.invalid", 443))
+    with pytest.raises(AssertionError, match="attempted network access"):
+        socket.getaddrinfo("example.invalid", 443)
+    with socket.socket() as connection:
+        with pytest.raises(AssertionError, match="attempted network access"):
+            connection.connect(("127.0.0.1", 443))
     attempted.clear()
     before = root_state(status_root)
+    selection = ["d.revoked"] if step == "history" else []
     monkeypatch.setattr(
-        sys, "argv", ["quant-research", "data", "status", "--root", str(status_root)]
+        sys, "argv", ["quant-research", "data", step, *selection, "--root", str(status_root)]
     )
-    main()
+    command.main()
     output = capsys.readouterr()
     assert output.err == ""
-    assert [(row["dataset"], row["status"]) for row in json.loads(output.out)] == [
-        ("a.documented", "documented"),
-        ("b.approved", "approved"),
-        ("c.validated", "validated"),
-        ("d.revoked", "revoked"),
-    ]
+    rows = json.loads(output.out)
+    if step == "history":
+        assert [(row["dataset"], row["kind"]) for row in rows] == [
+            ("d.revoked", "documented"),
+            ("d.revoked", "validated"),
+            ("d.revoked", "approved"),
+            ("d.revoked", "revoked"),
+        ]
+    else:
+        assert [(row["dataset"], row["status"]) for row in rows] == [
+            ("a.documented", "documented"),
+            ("b.approved", "approved"),
+            ("c.validated", "validated"),
+            ("d.revoked", "revoked"),
+        ]
     assert attempted == []
     assert root_state(status_root) == before
 
