@@ -1,6 +1,8 @@
 {
   "claudeMdExcludes": [
-    "/Users/*/.claude/rules/pstack-models.md"
+    "/Users/*/.claude/rules/pstack-models.md",
+    "/home/*/.claude/rules/pstack-models.md",
+    "/root/.claude/rules/pstack-models.md"
   ],
   "enabledPlugins": {
     "superpowers@claude-plugins-official": false,
