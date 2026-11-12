@@ -6,7 +6,7 @@ This page distinguishes the implemented repository from the proposed platform. R
 
 The [master-plan source basis](master-plan.md#source-basis) describes the archived ChatGPT discussions and report. They are source material rather than inspected framework implementations, and this public copy leaves them out.
 
-The vendored [pstack source](../.agents/pstack-source.json) supplies the project's agent workflows. [Codex model settings](../.agents/pstack-models.md) and [Claude model settings](../.claude/rules/pstack-models.md) are project-local. [AGENTS.md](../AGENTS.md) directs agents to poteto mode and the living project record. A `SessionStart` hook in the [project Claude settings](../.claude/settings.json) repeats the poteto mode instruction at the start of every Claude Code session.
+The vendored [pstack source](../.agents/pstack-source.json) supplies the project's agent workflows. [Codex model settings](../.agents/pstack-models.md) and [Claude model settings](../.claude/rules/pstack-models.md) are project-local. [AGENTS.md](../AGENTS.md) directs agents to poteto mode and the living project record. Claude Code 2.1.277 and later load AGENTS.md when a repository has no CLAUDE.md, so Claude Code sessions get the same instruction as Codex. The [project Claude settings](../.claude/settings.json) exclude the user-level `~/.claude/rules/pstack-models.md`, so only the project's model settings load.
 
 The repository foundation is implemented in [tools/repo.py](../tools/repo.py), its [pytest shard plugin](../tools/shards.py), and the [Makefile](../Makefile). It provides disposable Git snapshots, dependency preparation, offline verification, installed Git hooks, and guarded PR creation.
 

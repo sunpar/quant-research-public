@@ -1,4 +1,9 @@
 {
+  "claudeMdExcludes": [
+    "/Users/*/.claude/rules/pstack-models.md",
+    "/home/*/.claude/rules/pstack-models.md",
+    "/root/.claude/rules/pstack-models.md"
+  ],
   "enabledPlugins": {
     "superpowers@claude-plugins-official": false,
     "pstack@cursor-plugins": false,
@@ -13,16 +18,6 @@
     "feature-dev@claude-plugins-official": false
   },
   "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo 'For any change or PR, work in poteto mode: read .agents/pstack/skills/poteto-mode/SKILL.md in full, open the matching playbook in .agents/pstack/skills/poteto-mode/playbooks/, and copy its steps verbatim into the task list before the first edit.'"
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "matcher": "Bash",

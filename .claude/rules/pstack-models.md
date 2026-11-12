@@ -1,6 +1,6 @@
 # pstack model configuration for Claude Code
 
-Use this project file for all pstack model settings, including reads, fallbacks, writes, and setup reruns. It replaces ~/.claude/rules/pstack-models.md and the older ~/.agents/pstack-models.md within this repository. Keep these preferences project-local.
+Use this project file for all pstack model settings, including reads, fallbacks, writes, and setup reruns. `.claude/settings.json` excludes ~/.claude/rules/pstack-models.md here. Keep these preferences project-local.
 
 Pass each entry's model and effort separately to Agent. Panel lists run one seat per entry.
 
